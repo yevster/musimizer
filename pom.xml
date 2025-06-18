@@ -9,12 +9,24 @@
     <packaging>jar</packaging>
     <name>Musimizer</name>
     <description>Random Album Picker for Music Collections</description>
+    <url>https://github.com/yevster/musimizer</url>
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <!-- Set this to your JavaFX SDK lib path if needed -->
-        <path.to.javafx>${env.JAVAFX_SDK}/lib</path.to.javafx>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <javafx.version>21.0.1</javafx.version>
+        <gluonfx.plugin.version>1.0.26</gluonfx.plugin.version>
+        <mainClass>com.musimizer.MainApp</mainClass>
+        <javafx.platform>win</javafx.platform>
+        <gluonfx.target>host</gluonfx.target>
     </properties>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>gluon-releases</id>
+            <url>https://nexus.gluonhq.com/nexus/content/repositories/releases/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
@@ -27,6 +39,15 @@
             <version>21.0.1</version>
         </dependency>
     </dependencies>
+    <profiles>
+        <profile>
+            <id>native</id>
+            <properties>
+                <javafx.native.image>true</javafx.native.image>
+            </properties>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>
@@ -54,11 +75,52 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.3.1</version>
+            </plugin>
+
+            <!-- GluonFX Maven Plugin for native builds -->
+            <plugin>
+                <groupId>com.gluonhq</groupId>
+                <artifactId>gluonfx-maven-plugin</artifactId>
+                <version>${gluonfx.plugin.version}</version>
                 <configuration>
-                    <nonFilteredFileExtensions>
-                        <nonFilteredFileExtension>png</nonFilteredFileExtension>
-                    </nonFilteredFileExtensions>
+                    <target>${gluonfx.target}</target>
+                    <mainClass>${mainClass}</mainClass>
+                    <reflectionList>
+                        <list>com.musimizer.MainApp</list>
+                        <list>com.musimizer.AppController</list>
+                        <list>com.musimizer.AppUI</list>
+                        <list>com.musimizer.AlbumPicker</list>
+                        <list>com.musimizer.SettingsManager</list>
+                    </reflectionList>
+                    <resourcesList>
+                        <pattern>.*\\.properties</pattern>
+                        <pattern>.*\\.fxml</pattern>
+                        <pattern>.*\\.css</pattern>
+                        <pattern>.*\\.png</pattern>
+                    </resourcesList>
                 </configuration>
+            </plugin>
+
+            <!-- Maven Shade Plugin for creating a fat JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${mainClass}</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
