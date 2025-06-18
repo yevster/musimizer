@@ -44,7 +44,7 @@ jobs:
       run: mvn -B gluonfx:build -Dgluonfx.target=host-macos -DskipTests
       
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: native-executable-${{ runner.os }}
         path: |
