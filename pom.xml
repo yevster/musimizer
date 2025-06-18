@@ -2,6 +2,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <scm>
+        <connection>scm:git:https://github.com/yevster/musimizer.git</connection>
+        <developerConnection>scm:git:git@github.com:yevster/musimizer.git</developerConnection>
+        <url>https://github.com/yevster/musimizer</url>
+        <tag>HEAD</tag>
+    </scm>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.musimizer</groupId>
     <artifactId>musimizer</artifactId>
@@ -10,16 +16,16 @@
     <name>Musimizer</name>
     <description>Random Album Picker for Music Collections</description>
     <url>https://github.com/yevster/musimizer</url>
+
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.1</javafx.version>
-        <gluonfx.plugin.version>1.0.26</gluonfx.plugin.version>
         <mainClass>com.musimizer.MainApp</mainClass>
         <javafx.platform>win</javafx.platform>
-        <gluonfx.target>host</gluonfx.target>
     </properties>
+
     <pluginRepositories>
         <pluginRepository>
             <id>gluon-releases</id>
@@ -39,6 +45,7 @@
             <version>21.0.1</version>
         </dependency>
     </dependencies>
+
     <profiles>
         <profile>
             <id>native</id>
@@ -59,27 +66,26 @@
                 </configuration>
             </plugin>
             <plugin>
-    <groupId>org.openjfx</groupId>
-    <artifactId>javafx-maven-plugin</artifactId>
-    <version>0.0.8</version>
-    <configuration>
-        <mainClass>com.musimizer.MainApp</mainClass>
-        <jlinkImageName>musimizer-jlink</jlinkImageName>
-        <launcher>musimizer</launcher>
-        <stripDebug>true</stripDebug>
-        <compress>2</compress>
-        <noHeaderFiles>true</noHeaderFiles>
-        <noManPages>true</noManPages>
-        <addModules>javafx.controls,javafx.fxml</addModules>
-    </configuration>
-</plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>com.musimizer.MainApp</mainClass>
+                    <jlinkImageName>musimizer-jlink</jlinkImageName>
+                    <launcher>musimizer</launcher>
+                    <stripDebug>true</stripDebug>
+                    <compress>2</compress>
+                    <noHeaderFiles>true</noHeaderFiles>
+                    <noManPages>true</noManPages>
+                    <addModules>javafx.controls,javafx.fxml</addModules>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.3.1</version>
             </plugin>
 
-            <!-- Maven Shade Plugin for creating a fat JAR -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -99,6 +105,18 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>3.0.1</version>
+                <configuration>
+                    <tagNameFormat>v@{project.version}</tagNameFormat>
+                    <releaseProfiles>release</releaseProfiles>
+                    <pushChanges>true</pushChanges>
+                    <goals>deploy</goals>
+                </configuration>
             </plugin>
         </plugins>
     </build>
