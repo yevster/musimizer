@@ -59,46 +59,24 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
-                <configuration>
-                    <mainClass>com.musimizer.MainApp</mainClass>
-                    <jvmArgs>
-                        <jvmArg>--module-path</jvmArg>
-                        <jvmArg>${env.JAVAFX_SDK}/lib</jvmArg>
-                        <jvmArg>--add-modules=javafx.controls,javafx.fxml</jvmArg>
-                    </jvmArgs>
-                </configuration>
-            </plugin>
+    <groupId>org.openjfx</groupId>
+    <artifactId>javafx-maven-plugin</artifactId>
+    <version>0.0.8</version>
+    <configuration>
+        <mainClass>com.musimizer.MainApp</mainClass>
+        <jlinkImageName>musimizer-jlink</jlinkImageName>
+        <launcher>musimizer</launcher>
+        <stripDebug>true</stripDebug>
+        <compress>2</compress>
+        <noHeaderFiles>true</noHeaderFiles>
+        <noManPages>true</noManPages>
+        <addModules>javafx.controls,javafx.fxml</addModules>
+    </configuration>
+</plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.3.1</version>
-            </plugin>
-
-            <!-- GluonFX Maven Plugin for native builds -->
-            <plugin>
-                <groupId>com.gluonhq</groupId>
-                <artifactId>gluonfx-maven-plugin</artifactId>
-                <version>${gluonfx.plugin.version}</version>
-                <configuration>
-                    <target>${gluonfx.target}</target>
-                    <mainClass>${mainClass}</mainClass>
-                    <reflectionList>
-                        <list>com.musimizer.MainApp</list>
-                        <list>com.musimizer.AppController</list>
-                        <list>com.musimizer.AppUI</list>
-                        <list>com.musimizer.AlbumPicker</list>
-                        <list>com.musimizer.SettingsManager</list>
-                    </reflectionList>
-                    <resourcesList>
-                        <pattern>.*\\.properties</pattern>
-                        <pattern>.*\\.fxml</pattern>
-                        <pattern>.*\\.css</pattern>
-                        <pattern>.*\\.png</pattern>
-                    </resourcesList>
-                </configuration>
             </plugin>
 
             <!-- Maven Shade Plugin for creating a fat JAR -->
@@ -125,7 +103,3 @@
         </plugins>
     </build>
 </project>
-<!--
-If you encounter module errors, download the JavaFX SDK from https://gluonhq.com/products/javafx/ and set the JAVAFX_SDK environment variable to the SDK root.
-Example: set JAVAFX_SDK=C:/javafx-sdk-21.0.1
--->

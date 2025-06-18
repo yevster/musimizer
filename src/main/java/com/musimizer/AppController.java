@@ -1,16 +1,14 @@
 package com.musimizer;
 
-import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ListView;
-import javafx.stage.Stage;
-
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.scene.control.ListView;
+import javafx.stage.Stage;
 
 public class AppController {
     private final Stage stage;
