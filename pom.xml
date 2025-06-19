@@ -24,13 +24,6 @@
         <javafx.platform>win</javafx.platform>
     </properties>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>gluon-releases</id>
-            <url>https://nexus.gluonhq.com/nexus/content/repositories/releases/</url>
-        </pluginRepository>
-    </pluginRepositories>
-
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
