@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <scm>
         <connection>scm:git:https://github.com/yevster/musimizer.git</connection>
-        <developerConnection>scm:git:git@github.com:yevster/musimizer.git</developerConnection>
+        <developerConnection>scm:git:https://github.com/yevster/musimizer.git</developerConnection>
         <url>https://github.com/yevster/musimizer.git</url>
     </scm>
     <modelVersion>4.0.0</modelVersion>
