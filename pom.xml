@@ -3,13 +3,12 @@
     <scm>
         <connection>scm:git:https://github.com/yevster/musimizer.git</connection>
         <developerConnection>scm:git:git@github.com:yevster/musimizer.git</developerConnection>
-        <url>https://github.com/yevster/musimizer</url>
-        <tag>v1.0.4</tag>
+        <url>https://github.com/yevster/musimizer.git</url>
     </scm>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.musimizer</groupId>
     <artifactId>musimizer</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Musimizer</name>
     <description>Random Album Picker for Music Collections</description>
