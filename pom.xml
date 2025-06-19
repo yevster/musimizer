@@ -63,6 +63,7 @@
                 <configuration>
                     <mainClass>com.musimizer.MainApp</mainClass>
                     <jlinkImageName>musimizer-jlink</jlinkImageName>
+                    <jlinkZipName>musimizer-${project.version}</jlinkZipName>
                     <launcher>musimizer</launcher>
                     <stripDebug>true</stripDebug>
                     <compress>2</compress>
