@@ -37,6 +37,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: musimizer-${{ steps.vars.outputs.version }}.zip
+          files: target/musimizer-${{ steps.vars.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.DEPLOY_PAT }}
