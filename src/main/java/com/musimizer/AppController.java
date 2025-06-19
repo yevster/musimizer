@@ -2,7 +2,6 @@ package com.musimizer;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -44,47 +43,83 @@ public class AppController {
             initializeAlbumPicker();
         }
     }
+
+    public void pickAlbums() {
+        try {
+            int numPicks = SettingsManager.getNumberOfPicks();
+            albumPicker.generateNewPicks(numPicks);
+            albumList.setAll(albumPicker.getCurrentPicks());
+        } catch (IllegalStateException e) {
+            // Show error message and prompt for settings if music directory is invalid
+            boolean openSettings = AppUI.showErrorWithOptions("Music Directory Error", 
+                "Error generating album picks", 
+                e.getMessage() + "\n\nWould you like to open settings to correct this?");
+            
+            if (openSettings) {
+                showSettingsDialog();
+            }
+        }
+    }
     
     private void initializeAlbumPicker() {
         if (musicDir == null || musicDir.isEmpty()) {
             return;
         }
-        exclusionFile = AppController.getExclusionFilePath();
-        albumPicker = new AlbumPicker(Paths.get(musicDir), exclusionFile);
-        pickAlbums();
+        
+        try {
+            exclusionFile = AppController.getExclusionFilePath();
+            albumPicker = new AlbumPicker(Paths.get(musicDir), exclusionFile);
+            albumPicker.loadSavedPicks();
+            
+            if (albumPicker.getCurrentPicks().isEmpty()) {
+                try {
+                    albumPicker.generateNewPicks(25);
+                } catch (IllegalStateException e) {
+                    // Show error but don't show settings dialog yet to avoid loops
+                    AppUI.showError("Error Initializing", "Could not generate initial album picks", e.getMessage());
+                }
+            }
+            
+            albumList.setAll(albumPicker.getCurrentPicks());
+            
+        } catch (Exception e) {
+            AppUI.showError("Initialization Error", "Failed to initialize album picker", e.getMessage());
+        }
     }
 
     private void showSettingsDialog() {
         SettingsDialog dialog = new SettingsDialog(stage);
         dialog.initOwner(stage);
-        dialog.showAndWait().ifPresent(dir -> {
-            if (dir != null && !dir.isEmpty()) {
-                SettingsManager.setMusicDir(dir);
-                musicDir = dir;
+        dialog.showAndWait().ifPresent(settings -> {
+            if (settings != null && settings.musicDir != null && !settings.musicDir.isEmpty()) {
+                // Save the music directory
+                SettingsManager.setMusicDir(settings.musicDir);
+                musicDir = settings.musicDir;
+                
+                // Save the number of picks setting
+                SettingsManager.setNumberOfPicks(settings.numberOfPicks);
+                
+                // Reinitialize with new settings
                 initializeAlbumPicker();
             } else {
-                Platform.exit();
+                // If no valid settings and no existing music directory, exit
+                if (musicDir == null || musicDir.isEmpty()) {
+                    Platform.exit();
+                }
             }
         });
         
+        // If we still don't have a music directory after the dialog, exit
         if (musicDir == null || musicDir.isEmpty()) {
             Platform.exit();
         }
     }
 
-    public void pickAlbums() {
-        List<String> picked = albumPicker.pickRandomAlbums(25);
-        albumList.setAll(picked);
-    }
-
     public void excludeAlbum(String albumPath) {
         albumPicker.excludeAlbum(albumPath);
-        pickAlbums();
-    }
-
-    // Exclude album without refreshing the entire list
-    public void excludeAlbumNoRefresh(String albumPath) {
-        albumPicker.excludeAlbum(albumPath);
+        // Don't call pickAlbums() here as it would load the saved picks
+        // Instead, just remove the excluded album from the current view
+        albumList.remove(albumPath);
     }
 
     public static Path getExclusionFilePath() {

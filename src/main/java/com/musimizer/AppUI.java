@@ -7,6 +7,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
@@ -20,6 +21,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import javafx.util.Callback;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.control.Tooltip;
+import java.awt.Desktop;
 
 public class AppUI {
     public static BorderPane createRootPane(Stage primaryStage) {
@@ -42,14 +45,18 @@ public class AppUI {
         // Main content
         Label title = new Label("Randomly Selected Albums");
         ListView<String> albumList = new ListView<>();
+        
+        // Pick button
         Button pickButton = new Button("Pick New Random Selections");
+        pickButton.setStyle("-fx-base: #2196F3; -fx-text-fill: white;");
+        
         VBox vbox = new VBox(10, title, albumList, pickButton);
         vbox.setPadding(new Insets(20));
         VBox.setVgrow(albumList, Priority.ALWAYS);
         root.setCenter(vbox);
 
         // Controller manages album picking and exclusion
-        AppController controller = new AppController(null, albumList);
+        AppController controller = new AppController(primaryStage, albumList);
         root.setUserData(controller);
 
         albumList.setCellFactory(new Callback<>() {
@@ -57,70 +64,97 @@ public class AppUI {
             public ListCell<String> call(ListView<String> param) {
                 return new ListCell<>() {
                     private final Label albumLabel = new Label();
-                    private final CheckBox excludeBox = new CheckBox();
+                    private final Button excludeButton = new Button();
                     private final Button folderButton = new Button();
                     private final HBox hbox = new HBox();
                     {
-                        hbox.getChildren().addAll(albumLabel, folderButton, excludeBox);
+                        hbox.getChildren().addAll(albumLabel, folderButton, excludeButton);
                         hbox.setSpacing(10);
                         HBox.setHgrow(albumLabel, Priority.ALWAYS);
                         albumLabel.setMaxWidth(Double.MAX_VALUE);
                         hbox.setFillHeight(true);
                         hbox.setStyle("-fx-alignment: center-left;");
-                        excludeBox.setStyle("-fx-alignment: center-right;");
-
+                        
                         // SVG folder icon
                         SVGPath folderIcon = new SVGPath();
                         folderIcon.setContent(
                                 "M3 7V5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.41.59l1.83 1.82H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm2 0h14v8H5V7z");
-                        folderIcon.setStyle("-fx-fill: #888;");
+                        folderIcon.setStyle("-fx-fill: #d5bd1f;");
                         folderIcon.setScaleX(0.9);
                         folderIcon.setScaleY(0.9);
                         folderButton.setGraphic(folderIcon);
                         folderButton.setPrefWidth(20);
                         folderButton.setPrefHeight(20);
+                        folderButton.setStyle("-fx-background-color: transparent; -fx-padding: 2;");
+                        
+                        // SVG do not enter icon (solid circle with single thick diagonal line)
+                        SVGPath noEntryIcon = new SVGPath();
+                        // Solid circle with single thick diagonal line from top-left to bottom-right
+                        noEntryIcon.setContent(
+                            // Circle
+                            "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" +
+                            // Single thick diagonal line from top-left to bottom-right
+                            "M5 5l14 14");
+                        noEntryIcon.setStyle(
+                            "-fx-fill: #ffffff;" +
+                            "-fx-stroke: #ff0000;" +  // Brighter red for the line
+                            "-fx-stroke-width: 3.5;" +  // Thicker line
+                            "-fx-stroke-linecap: round;");  // Rounded line ends
+                        noEntryIcon.setScaleX(0.7);
+                        noEntryIcon.setScaleY(0.7);
+                        excludeButton.setGraphic(noEntryIcon);
+                        excludeButton.setPrefWidth(28);  // Slightly larger to accommodate the thicker lines
+                        excludeButton.setPrefHeight(28);
+                        excludeButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-opacity: 0.7;");
+                        
+                        // Add hover effects
+                        excludeButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
+                            excludeButton.setStyle(
+                                "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") + 
+                                " -fx-padding: 2;" + 
+                                " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+                        });
                         folderButton.setMinWidth(20);
                         folderButton.setMinHeight(20);
                         folderButton.setMaxWidth(20);
                         folderButton.setMaxHeight(20);
                         folderButton.setStyle("-fx-background-color: transparent; -fx-cursor: hand;");
-                        folderButton.setFocusTraversable(false);
+                        folderButton.setTooltip(new Tooltip("Open album folder"));
 
+                        // Add action for folder button
                         folderButton.setOnAction(e -> {
                             String album = getItem();
                             if (album != null) {
-                                // Album string is in the format "Artist - Album"
-                                int sep = album.indexOf(" - ");
-                                if (sep > 0) {
-                                    String artist = album.substring(0, sep);
-                                    String albumName = album.substring(sep + 3);
-                                    String musicDir = SettingsManager.getMusicDir();
-                                    if (musicDir != null && !musicDir.isEmpty()) {
-                                        Path albumPath = java.nio.file.Paths.get(musicDir, artist, albumName);
-                                        java.io.File dir = albumPath.toFile();
-                                        if (dir.exists() && dir.isDirectory()) {
-                                            try {
-                                                java.awt.Desktop.getDesktop().open(dir);
-                                            } catch (Exception ex) {
-                                                // Optionally show error dialog
-                                                AppUI.showError("Could not open folder",
-                                                        "Error opening album folder: " + dir.getAbsolutePath(),
-                                                        ex.getMessage());
-                                            }
-                                        } else {
-                                            AppUI.showError("Folder Not Found", "Album directory does not exist:",
-                                                    dir.getAbsolutePath());
+                                String[] parts = album.split(" - ", 2);
+                                if (parts.length == 2) {
+                                    java.io.File dir = new java.io.File(SettingsManager.getMusicDir(), 
+                                            parts[0] + java.io.File.separator + parts[1]);
+                                    if (dir.exists() && dir.isDirectory()) {
+                                        try {
+                                            Desktop.getDesktop().open(dir);
+                                        } catch (Exception ex) {
+                                            // Optionally show error dialog
+                                            showError("Could not open folder",
+                                                    "Error opening album folder: " + dir.getAbsolutePath(),
+                                                    ex.getMessage());
                                         }
+                                    } else {
+                                        showError("Folder Not Found", "Album directory does not exist:",
+                                                dir.getAbsolutePath());
                                     }
                                 }
                             }
                         });
 
-                        excludeBox.setOnAction(e -> {
+                        // Set tooltip for exclude button
+                        excludeButton.setTooltip(new Tooltip("Exclude this album"));
+                        
+                        // Add action for exclude button
+                        excludeButton.setOnAction(e -> {
                             String album = getItem();
-                            if (album != null && excludeBox.isSelected()) {
-                                AppController ctrl = (AppController) root.getUserData();
-                                ctrl.excludeAlbumNoRefresh(album);
+                            if (album != null) {
+                                AppController ctrl = (AppController) param.getScene().getRoot().getUserData();
+                                ctrl.excludeAlbum(album);
                                 // Remove only this album from the list view
                                 param.getItems().remove(album);
                             }
@@ -134,7 +168,6 @@ public class AppUI {
                             setGraphic(null);
                         } else {
                             albumLabel.setText(item);
-                            excludeBox.setSelected(false);
                             setGraphic(hbox);
                         }
                     }
@@ -153,9 +186,12 @@ public class AppUI {
     private static void showSettings(Stage owner) {
         SettingsDialog dialog = new SettingsDialog(owner);
         dialog.initOwner(owner);
-        dialog.showAndWait().ifPresent(dir -> {
-            if (dir != null && !dir.isEmpty()) {
-                SettingsManager.setMusicDir(dir);
+        dialog.showAndWait().ifPresent(settings -> {
+            if (settings != null && settings.musicDir != null && !settings.musicDir.isEmpty()) {
+                // Update settings
+                SettingsManager.setMusicDir(settings.musicDir);
+                SettingsManager.setNumberOfPicks(settings.numberOfPicks);
+                
                 // Refresh the album list with new settings
                 AppController ctrl = (AppController) ((BorderPane) owner.getScene().getRoot()).getUserData();
                 ctrl.reinitializeWithNewSettings();
@@ -181,12 +217,35 @@ public class AppUI {
         }
     }
 
-    private static void showError(String title, String header, String content) {
+    public static void showError(String title, String header, String content) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(header);
         alert.setContentText(content);
         alert.showAndWait();
+    }
+    
+    /**
+     * Shows an error dialog with options to the user
+     * @param title The title of the dialog
+     * @param header The header text
+     * @param content The content text (should include the question for the user)
+     * @return true if the user clicks OK/Yes, false if they click Cancel/No
+     */
+    public static boolean showErrorWithOptions(String title, String header, String content) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(header);
+        alert.setContentText(content);
+        
+        // Customize the button types
+        ButtonType yesButton = new ButtonType("Yes");
+        ButtonType noButton = new ButtonType("No");
+        alert.getButtonTypes().setAll(yesButton, noButton);
+        
+        // Show the dialog and wait for user response
+        java.util.Optional<ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == yesButton;
     }
 
     private static void showInfo(String title, String content) {
