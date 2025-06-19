@@ -19,6 +19,7 @@ import java.awt.Desktop;
 import java.io.IOException;
 import java.nio.file.Path;
 import javafx.util.Callback;
+import javafx.scene.shape.SVGPath;
 
 public class AppUI {
     public static BorderPane createRootPane(Stage primaryStage) {
@@ -57,15 +58,64 @@ public class AppUI {
                 return new ListCell<>() {
                     private final Label albumLabel = new Label();
                     private final CheckBox excludeBox = new CheckBox();
+                    private final Button folderButton = new Button();
                     private final HBox hbox = new HBox();
                     {
-                        hbox.getChildren().addAll(albumLabel, excludeBox);
+                        hbox.getChildren().addAll(albumLabel, folderButton, excludeBox);
                         hbox.setSpacing(10);
                         HBox.setHgrow(albumLabel, Priority.ALWAYS);
                         albumLabel.setMaxWidth(Double.MAX_VALUE);
                         hbox.setFillHeight(true);
                         hbox.setStyle("-fx-alignment: center-left;");
                         excludeBox.setStyle("-fx-alignment: center-right;");
+
+                        // SVG folder icon
+                        SVGPath folderIcon = new SVGPath();
+                        folderIcon.setContent(
+                                "M3 7V5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.41.59l1.83 1.82H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm2 0h14v8H5V7z");
+                        folderIcon.setStyle("-fx-fill: #888;");
+                        folderIcon.setScaleX(0.9);
+                        folderIcon.setScaleY(0.9);
+                        folderButton.setGraphic(folderIcon);
+                        folderButton.setPrefWidth(20);
+                        folderButton.setPrefHeight(20);
+                        folderButton.setMinWidth(20);
+                        folderButton.setMinHeight(20);
+                        folderButton.setMaxWidth(20);
+                        folderButton.setMaxHeight(20);
+                        folderButton.setStyle("-fx-background-color: transparent; -fx-cursor: hand;");
+                        folderButton.setFocusTraversable(false);
+
+                        folderButton.setOnAction(e -> {
+                            String album = getItem();
+                            if (album != null) {
+                                // Album string is in the format "Artist - Album"
+                                int sep = album.indexOf(" - ");
+                                if (sep > 0) {
+                                    String artist = album.substring(0, sep);
+                                    String albumName = album.substring(sep + 3);
+                                    String musicDir = SettingsManager.getMusicDir();
+                                    if (musicDir != null && !musicDir.isEmpty()) {
+                                        Path albumPath = java.nio.file.Paths.get(musicDir, artist, albumName);
+                                        java.io.File dir = albumPath.toFile();
+                                        if (dir.exists() && dir.isDirectory()) {
+                                            try {
+                                                java.awt.Desktop.getDesktop().open(dir);
+                                            } catch (Exception ex) {
+                                                // Optionally show error dialog
+                                                AppUI.showError("Could not open folder",
+                                                        "Error opening album folder: " + dir.getAbsolutePath(),
+                                                        ex.getMessage());
+                                            }
+                                        } else {
+                                            AppUI.showError("Folder Not Found", "Album directory does not exist:",
+                                                    dir.getAbsolutePath());
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
                         excludeBox.setOnAction(e -> {
                             String album = getItem();
                             if (album != null && excludeBox.isSelected()) {
