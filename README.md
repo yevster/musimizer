@@ -8,6 +8,12 @@ After that, it will show you a random list of albums. If you don't want to liste
 
 ---
 
+## Notes
+- For issues or suggestions, please open an issue on the [GitHub Issues page](https://github.com/yevster/musimizer/issues).
+- Most of this code (and all of the bugs) is AI generated. Read it at your peril.
+
+---
+
 ## How to Run Musimizer
 
 ### Download the Application
@@ -37,12 +43,6 @@ After that, it will show you a random list of albums. If you don't want to liste
      chmod +x ./musimizer
      ./musimizer
      ```
-
----
-
-## Notes
-- For issues or suggestions, please open an issue on the [GitHub Issues page](https://github.com/yevster/musimizer/issues).
-- Most of this code (and all of the bugs) is AI generated. Read it at your peril.
 
 ---
 
