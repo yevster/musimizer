@@ -1,9 +1,16 @@
 package com.musimizer;
 
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+
+import javafx.application.Platform;
 
 public class AlbumPicker {
     private final Path musicDir;
@@ -64,6 +71,43 @@ public class AlbumPicker {
         currentPicks.remove(albumPath);
         saveCurrentPicks();
         saveExclusions();
+    }
+    
+    public List<String> searchAlbums(List<String> searchTerms, int maxResults) {
+        if (searchTerms == null || searchTerms.isEmpty() || maxResults <= 0) {
+            return Collections.emptyList();
+        }
+        
+        try {
+            // Get all albums and filter out excluded ones
+            List<String> allAlbums = findAlbums();
+            List<String> matchingAlbums = allAlbums.stream()
+                .filter(album -> !excludedAlbums.contains(album))
+                .filter(album -> {
+                    String albumLower = album.toLowerCase();
+                    return searchTerms.stream()
+                        .map(String::toLowerCase)
+                        .allMatch(term -> albumLower.contains(term));
+                })
+                .collect(Collectors.toList());
+                
+            // Randomize the results
+            Collections.shuffle(matchingAlbums);
+            
+            // Limit the number of results based on maxResults parameter
+            if (matchingAlbums.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            int endIndex = Math.min(maxResults, matchingAlbums.size());
+            return matchingAlbums.subList(0, endIndex);
+            
+        } catch (Exception e) {
+            Platform.runLater(() -> 
+                AppUI.showError("Search Error", "Error searching albums", e.getMessage())
+            );
+            return Collections.emptyList();
+        }
     }
 
     private Set<String> loadExclusions() {

@@ -13,10 +13,12 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
     public static class Settings {
         public final String musicDir;
         public final int numberOfPicks;
+        public final int numberOfSearchResults;
 
-        public Settings(String musicDir, int numberOfPicks) {
+        public Settings(String musicDir, int numberOfPicks, int numberOfSearchResults) {
             this.musicDir = musicDir;
             this.numberOfPicks = numberOfPicks;
+            this.numberOfSearchResults = numberOfSearchResults;
         }
     }
 
@@ -26,6 +28,7 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         // Load current settings
         String currentDir = SettingsManager.getMusicDir();
         int currentPicks = SettingsManager.getNumberOfPicks();
+        int currentSearchResults = SettingsManager.getNumberOfSearchResults();
         
         GridPane grid = new GridPane();
         grid.setHgap(10);
@@ -41,16 +44,34 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         Spinner<Integer> picksSpinner = new Spinner<>(1, 100, currentPicks);
         picksSpinner.setEditable(true);
         
-        // Set up the spinner to only accept numbers
-        SpinnerValueFactory.IntegerSpinnerValueFactory valueFactory = 
+        // Number of search results controls
+        Label searchResultsLabel = new Label("Number of Search Results:");
+        Spinner<Integer> searchResultsSpinner = new Spinner<>(1, 100, currentSearchResults);
+        searchResultsSpinner.setEditable(true);
+        
+        // Set up the spinners to only accept numbers
+        SpinnerValueFactory.IntegerSpinnerValueFactory picksFactory = 
             (SpinnerValueFactory.IntegerSpinnerValueFactory) picksSpinner.getValueFactory();
-        valueFactory.setConverter(new IntegerStringConverter() {
+        picksFactory.setConverter(new IntegerStringConverter() {
             @Override
             public Integer fromString(String s) {
                 try {
                     return super.fromString(s);
                 } catch (NumberFormatException e) {
                     return picksSpinner.getValue();
+                }
+            }
+        });
+        
+        SpinnerValueFactory.IntegerSpinnerValueFactory searchResultsFactory = 
+            (SpinnerValueFactory.IntegerSpinnerValueFactory) searchResultsSpinner.getValueFactory();
+        searchResultsFactory.setConverter(new IntegerStringConverter() {
+            @Override
+            public Integer fromString(String s) {
+                try {
+                    return super.fromString(s);
+                } catch (NumberFormatException e) {
+                    return searchResultsSpinner.getValue();
                 }
             }
         });
@@ -70,6 +91,8 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         grid.add(browse, 2, 0);
         grid.add(picksLabel, 0, 1);
         grid.add(picksSpinner, 1, 1);
+        grid.add(searchResultsLabel, 0, 2);
+        grid.add(searchResultsSpinner, 1, 2);
         
         // Set up browse button action
         browse.setOnAction(e -> {
@@ -115,7 +138,7 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         setResultConverter(btn -> {
             if (btn == ButtonType.OK) {
                 String dirPath = dirField.getText().trim();
-                return new Settings(dirPath, picksSpinner.getValue());
+                return new Settings(dirPath, picksSpinner.getValue(), searchResultsSpinner.getValue());
             }
             return null;
         });

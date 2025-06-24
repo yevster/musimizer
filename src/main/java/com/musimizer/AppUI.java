@@ -1,37 +1,51 @@
 package com.musimizer;
 
+import java.awt.Desktop;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
-import java.awt.Desktop;
-import java.io.IOException;
-import java.nio.file.Path;
-import javafx.util.Callback;
 import javafx.scene.shape.SVGPath;
-import javafx.scene.control.Tooltip;
-import java.awt.Desktop;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import javafx.util.Callback;
 
 public class AppUI {
     public static BorderPane createRootPane(Stage primaryStage) {
         BorderPane root = new BorderPane();
 
+        // Main content
+        ListView<String> albumList = new ListView<>();
+        
         // Create menu
         MenuBar menuBar = new MenuBar();
         Menu fileMenu = new Menu("File");
+        Menu editMenu = new Menu("Edit");
 
+        // File menu items
         MenuItem settingsItem = new MenuItem("Settings...");
         settingsItem.setOnAction(e -> showSettings(primaryStage));
 
@@ -39,25 +53,55 @@ public class AppUI {
         showExclusionsItem.setOnAction(e -> showExclusionList());
 
         fileMenu.getItems().addAll(settingsItem, showExclusionsItem);
-        menuBar.getMenus().add(fileMenu);
-        root.setTop(menuBar);
-
-        // Main content
-        Label title = new Label("Randomly Selected Albums");
-        ListView<String> albumList = new ListView<>();
         
-        // Pick button
+        // Edit menu items
+        MenuItem findItem = new MenuItem("Find...");
+        findItem.setAccelerator(KeyCombination.keyCombination("shortcut+F"));
+        ListView<String> finalAlbumList = albumList; // Create final variable for use in lambda
+        findItem.setOnAction(e -> showFindDialog(finalAlbumList, (AppController)root.getUserData()));
+        
+        editMenu.getItems().addAll(findItem);
+        
+        menuBar.getMenus().addAll(fileMenu, editMenu);
+        root.setTop(menuBar);
+        
+        // Buttons
         Button pickButton = new Button("Pick New Random Selections");
         pickButton.setStyle("-fx-base: #2196F3; -fx-text-fill: white;");
         
-        VBox vbox = new VBox(10, title, albumList, pickButton);
-        vbox.setPadding(new Insets(20));
+        Button backButton = new Button("Back to Random Picks");
+        backButton.setStyle("-fx-base: #FF9800; -fx-text-fill: white;");
+        backButton.setVisible(false);
+        
+        HBox buttonBox = new HBox(10, pickButton, backButton);
+        // Main content area with title and album list
+        Label titleLabel = new Label("Randomly Selected Albums");
+        VBox vbox = new VBox(10);
+        vbox.setPadding(new Insets(10));
+        vbox.getChildren().addAll(titleLabel, albumList);
         VBox.setVgrow(albumList, Priority.ALWAYS);
+        vbox.getChildren().add(buttonBox);
         root.setCenter(vbox);
 
         // Controller manages album picking and exclusion
-        AppController controller = new AppController(primaryStage, albumList);
+        AppController controller = new AppController(primaryStage, albumList, pickButton, backButton, titleLabel);
         root.setUserData(controller);
+        
+        // Set up button actions
+        pickButton.setOnAction(e -> controller.pickAlbums());
+        backButton.setOnAction(e -> controller.showRandomPicks());
+        
+        // Add key handler to the scene
+        Scene scene = primaryStage.getScene();
+        if (scene == null) {
+            primaryStage.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) {
+                    setupEscapeKeyHandler(newScene, controller);
+                }
+            });
+        } else {
+            setupEscapeKeyHandler(scene, controller);
+        }
 
         albumList.setCellFactory(new Callback<>() {
             @Override
@@ -175,10 +219,7 @@ public class AppUI {
             }
         });
 
-        pickButton.setOnAction(e -> {
-            AppController ctrl = (AppController) root.getUserData();
-            ctrl.pickAlbums();
-        });
+        // Button actions are now set up in the controller initialization
 
         return root;
     }
@@ -191,12 +232,73 @@ public class AppUI {
                 // Update settings
                 SettingsManager.setMusicDir(settings.musicDir);
                 SettingsManager.setNumberOfPicks(settings.numberOfPicks);
+                SettingsManager.setNumberOfSearchResults(settings.numberOfSearchResults);
                 
                 // Refresh the album list with new settings
                 AppController ctrl = (AppController) ((BorderPane) owner.getScene().getRoot()).getUserData();
                 ctrl.reinitializeWithNewSettings();
             }
         });
+    }
+
+    private static void showFindDialog(ListView<String> albumList, AppController controller) {
+        // Create a custom dialog
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Find Albums");
+        dialog.setHeaderText("Enter keywords to search for albums");
+        dialog.setContentText("Keywords (space-separated):");
+        
+        // Set the dialog to be application modal
+        dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        dialog.initStyle(StageStyle.UTILITY);
+        
+        // Create and style the Go button
+        ButtonType goButtonType = new ButtonType("Go", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().setAll(goButtonType, ButtonType.CANCEL);
+        
+        // Style the Go button to be green
+        javafx.scene.Node goButton = dialog.getDialogPane().lookupButton(goButtonType);
+        goButton.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white;");
+        
+        // Make the text field larger
+        dialog.getEditor().setPrefWidth(400);
+        
+        // Handle Enter key press in the text field
+        dialog.getEditor().setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                performSearch(dialog.getEditor().getText(), albumList, controller);
+                dialog.close();
+            }
+        });
+        
+        // Handle dialog result
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == goButtonType) {
+                return dialog.getEditor().getText();
+            }
+            return null;
+        });
+        
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(keywords -> performSearch(keywords, albumList, controller));
+    }
+    
+    private static void performSearch(String keywords, ListView<String> albumList, AppController controller) {
+        if (keywords == null || keywords.trim().isEmpty()) {
+            return;
+        }
+        
+        // Split keywords by whitespace and filter out empty strings
+        List<String> searchTerms = Arrays.stream(keywords.trim().split("\\s+"))
+                .filter(term -> !term.isEmpty())
+                .collect(Collectors.toList());
+                
+        if (searchTerms.isEmpty()) {
+            return;
+        }
+        
+        // Perform the search in the controller
+        controller.showSearchResults(searchTerms, keywords);
     }
 
     private static void showExclusionList() {
@@ -233,12 +335,12 @@ public class AppUI {
      * @return true if the user clicks OK/Yes, false if they click Cancel/No
      */
     public static boolean showErrorWithOptions(String title, String header, String content) {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText(header);
         alert.setContentText(content);
         
-        // Customize the button types
+        // Add custom buttons
         ButtonType yesButton = new ButtonType("Yes");
         ButtonType noButton = new ButtonType("No");
         alert.getButtonTypes().setAll(yesButton, noButton);
@@ -247,8 +349,17 @@ public class AppUI {
         java.util.Optional<ButtonType> result = alert.showAndWait();
         return result.isPresent() && result.get() == yesButton;
     }
-
-    private static void showInfo(String title, String content) {
+    
+    private static void setupEscapeKeyHandler(Scene scene, AppController controller) {
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                controller.showRandomPicks();
+                event.consume();
+            }
+        });
+    }
+    
+    public static void showInfo(String title, String content) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);
         alert.setHeaderText(null);

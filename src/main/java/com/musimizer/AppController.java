@@ -2,25 +2,36 @@ package com.musimizer;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.stage.Stage;
 
 public class AppController {
     private final Stage stage;
-    private final ListView<String> albumListView;
     private final ObservableList<String> albumList;
+    private final Button pickButton;
+    private final Button backButton;
+    private final Label titleLabel;
     private AlbumPicker albumPicker;
     private String musicDir;
     private Path exclusionFile;
+    private List<String> currentRandomPicks;
+    private static final String DEFAULT_TITLE = "Randomly Selected Albums";
 
-    public AppController(Stage stage, ListView<String> albumListView) {
-        this.stage = stage;
-        this.albumListView = albumListView;
+    public AppController(Stage primaryStage, ListView<String> albumListView, Button pickButton, Button backButton, Label titleLabel) {
+        this.stage = primaryStage;
         this.albumList = FXCollections.observableArrayList();
+        this.pickButton = pickButton;
+        this.backButton = backButton;
+        this.titleLabel = titleLabel;
+        this.currentRandomPicks = new ArrayList<>();
         albumListView.setItems(albumList);
         initialize();
     }
@@ -41,23 +52,6 @@ public class AppController {
         musicDir = SettingsManager.getMusicDir();
         if (musicDir != null && !musicDir.isEmpty()) {
             initializeAlbumPicker();
-        }
-    }
-
-    public void pickAlbums() {
-        try {
-            int numPicks = SettingsManager.getNumberOfPicks();
-            albumPicker.generateNewPicks(numPicks);
-            albumList.setAll(albumPicker.getCurrentPicks());
-        } catch (IllegalStateException e) {
-            // Show error message and prompt for settings if music directory is invalid
-            boolean openSettings = AppUI.showErrorWithOptions("Music Directory Error", 
-                "Error generating album picks", 
-                e.getMessage() + "\n\nWould you like to open settings to correct this?");
-            
-            if (openSettings) {
-                showSettingsDialog();
-            }
         }
     }
     
@@ -81,6 +75,7 @@ public class AppController {
             }
             
             albumList.setAll(albumPicker.getCurrentPicks());
+            titleLabel.setText(DEFAULT_TITLE);
             
         } catch (Exception e) {
             AppUI.showError("Initialization Error", "Failed to initialize album picker", e.getMessage());
@@ -96,8 +91,9 @@ public class AppController {
                 SettingsManager.setMusicDir(settings.musicDir);
                 musicDir = settings.musicDir;
                 
-                // Save the number of picks setting
+                // Save the settings
                 SettingsManager.setNumberOfPicks(settings.numberOfPicks);
+                SettingsManager.setNumberOfSearchResults(settings.numberOfSearchResults);
                 
                 // Reinitialize with new settings
                 initializeAlbumPicker();
@@ -122,6 +118,69 @@ public class AppController {
         albumList.remove(albumPath);
     }
 
+    public void showSearchResults(List<String> searchTerms, String keywords) {
+        if (searchTerms == null || searchTerms.isEmpty() || albumPicker == null) {
+            return;
+        }
+        
+        try {
+            // Save current random picks if not already in search mode
+            if (pickButton.isVisible()) {
+                currentRandomPicks = new ArrayList<>(albumList);
+            }
+            
+            // Get all albums that match the search terms, limited by search results setting
+            List<String> matchingAlbums = albumPicker.searchAlbums(searchTerms, SettingsManager.getNumberOfSearchResults());
+            
+            // Update the UI with search results
+            Platform.runLater(() -> {
+                albumList.setAll(matchingAlbums);
+                pickButton.setVisible(false);
+                backButton.setVisible(true);
+                titleLabel.setText("Search Results for: " + keywords);
+            });
+            
+        } catch (Exception e) {
+            Platform.runLater(() -> 
+                AppUI.showError("Search Error", "Error searching albums", e.getMessage())
+            );
+        }
+    }
+    
+    public void showRandomPicks() {
+        Platform.runLater(() -> {
+            if (!currentRandomPicks.isEmpty()) {
+                albumList.setAll(currentRandomPicks);
+            } else {
+                pickAlbums();
+            }
+            pickButton.setVisible(true);
+            backButton.setVisible(false);
+            titleLabel.setText(DEFAULT_TITLE);
+        });
+    }
+    
+    public void pickAlbums() {
+        try {
+            int numPicks = SettingsManager.getNumberOfPicks();
+            albumPicker.generateNewPicks(numPicks);
+            currentRandomPicks = new ArrayList<>(albumPicker.getCurrentPicks());
+            albumList.setAll(currentRandomPicks);
+            pickButton.setVisible(true);
+            backButton.setVisible(false);
+            titleLabel.setText(DEFAULT_TITLE);
+        } catch (IllegalStateException e) {
+            // Show error message and prompt for settings if music directory is invalid
+            boolean openSettings = AppUI.showErrorWithOptions("Music Directory Error", 
+                "Error generating album picks", 
+                e.getMessage() + "\n\nWould you like to open settings to correct this?");
+            
+            if (openSettings) {
+                showSettingsDialog();
+            }
+        }
+    }
+    
     public static Path getExclusionFilePath() {
         String os = System.getProperty("os.name").toLowerCase();
         String userHome = System.getProperty("user.home");

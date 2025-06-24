@@ -14,9 +14,11 @@ public class SettingsManager {
 	// Property keys
 	private static final String MUSIC_DIR_KEY = "music_dir";
 	private static final String NUMBER_OF_PICKS_KEY = "number_of_picks";
+	private static final String NUMBER_OF_SEARCH_RESULTS_KEY = "number_of_search_results";
 	
 	// Default values
 	private static final int DEFAULT_NUMBER_OF_PICKS = 25;
+	private static final int DEFAULT_NUMBER_OF_SEARCH_RESULTS = 25;
 	private static final String SETTINGS_COMMENT = "Musimizer Settings";
 
 
@@ -74,15 +76,14 @@ public class SettingsManager {
 
 
 	public static int getNumberOfPicks() {
+		String value = loadSettings().getProperty(NUMBER_OF_PICKS_KEY);
 		try {
-			return Integer.parseInt(loadSettings().getProperty(NUMBER_OF_PICKS_KEY, 
-				String.valueOf(DEFAULT_NUMBER_OF_PICKS)));
+			return value != null ? Integer.parseInt(value) : DEFAULT_NUMBER_OF_PICKS;
 		} catch (NumberFormatException e) {
-			return DEFAULT_NUMBER_OF_PICKS; // Default value if the setting is not a valid number
+			return DEFAULT_NUMBER_OF_PICKS;
 		}
 	}
-
-
+	
 	public static void setNumberOfPicks(int numberOfPicks) {
 		if (numberOfPicks < 1) {
 			numberOfPicks = 1; // Ensure at least 1 pick
@@ -91,4 +92,24 @@ public class SettingsManager {
 		props.setProperty(NUMBER_OF_PICKS_KEY, String.valueOf(numberOfPicks));
 		saveSettings(props);
 	}
+
+	public static int getNumberOfSearchResults() {
+		String value = loadSettings().getProperty(NUMBER_OF_SEARCH_RESULTS_KEY);
+		try {
+			return value != null ? Integer.parseInt(value) : DEFAULT_NUMBER_OF_SEARCH_RESULTS;
+		} catch (NumberFormatException e) {
+			return DEFAULT_NUMBER_OF_SEARCH_RESULTS;
+		}
+	}
+		
+	public static void setNumberOfSearchResults(int count) {
+		if (count < 1) {
+			count = 1; // Ensure at least 1 search result
+		}
+		Properties props = loadSettings();
+		props.setProperty(NUMBER_OF_SEARCH_RESULTS_KEY, String.valueOf(count));
+		saveSettings(props);
+	}
+	
+
 }
