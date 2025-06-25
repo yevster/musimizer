@@ -1,6 +1,7 @@
 package com.musimizer.controller;
 
 import com.musimizer.service.AlbumService;
+import com.musimizer.service.PlaybackService;
 import com.musimizer.repository.AlbumRepository;
 import com.musimizer.repository.FileAlbumRepository;
 import com.musimizer.ui.dialogs.SettingsDialog;
@@ -14,19 +15,21 @@ import javafx.scene.control.ListView;
 import javafx.stage.Stage;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 public class AppController {
     private final Stage stage;
     private final AlbumService albumService;
-    private final ListView<String> albumListView;
+    private final PlaybackService playbackService;
+    private final ListView<Path> albumListView;
     private final Button pickButton;
     private final Button backButton;
     private final Label titleLabel;
     private static final String DEFAULT_TITLE = "Randomly Selected Albums";
 
-    public AppController(Stage primaryStage, ListView<String> albumListView, Button pickButton, Button backButton, Label titleLabel) {
+    public AppController(Stage primaryStage, ListView<Path> albumListView, Button pickButton, Button backButton, Label titleLabel) {
         this.stage = primaryStage;
         this.albumListView = albumListView;
         this.pickButton = pickButton;
@@ -38,14 +41,15 @@ public class AppController {
         Path exclusionFile = SettingsManager.getExclusionFilePath();
         AlbumRepository albumRepository = new FileAlbumRepository();
         this.albumService = new AlbumService(albumRepository, musicDir, exclusionFile);
+        this.playbackService = new PlaybackService();
         
-        initialize();
+
     }
 
-    private void initialize() {
+    public void initialize() {
         String musicDir = SettingsManager.getMusicDir();
         if (musicDir == null || musicDir.isEmpty()) {
-            showSettingsDialog();
+            Platform.runLater(this::showSettingsDialog);
         } else {
             initializeAlbumPicker();
         }
@@ -56,6 +60,10 @@ public class AppController {
         if (musicDir != null && !musicDir.isEmpty()) {
             initializeAlbumPicker();
         }
+    }
+
+    public AlbumService getAlbumService() {
+        return albumService;
     }
     
     private void initializeAlbumPicker() {
@@ -119,10 +127,9 @@ public class AppController {
         }
     }
 
-    public void excludeAlbum(String albumPath) {
+    public void excludeAlbum(Path albumPath) {
         try {
             albumService.excludeAlbum(albumPath);
-            albumListView.getItems().remove(albumPath);
         } catch (Exception e) {
             ExceptionHandler.handle(e, "excluding album");
         }
@@ -134,18 +141,16 @@ public class AppController {
         }
         
         try {
-            List<String> matchingAlbums = albumService.searchAlbums(
-                searchTerms, 
-                SettingsManager.getNumberOfSearchResults()
-            );
-            
-            Platform.runLater(() -> {
-                updateAlbumList(matchingAlbums);
+            List<Path> searchResults = albumService.searchAlbums(searchTerms, SettingsManager.getNumberOfSearchResults());
+            if (searchResults.isEmpty()) {
+                updateAlbumList(Collections.emptyList()); // Clear the list
+                // Optionally, show a message in a Label or Dialog
+            } else {
+                updateAlbumList(searchResults);
                 pickButton.setVisible(false);
                 backButton.setVisible(true);
                 titleLabel.setText("Search Results for: " + keywords);
-            });
-            
+            }
         } catch (Exception e) {
             ExceptionHandler.handle(e, "searching albums");
         }
@@ -180,7 +185,19 @@ public class AppController {
         }
     }
     
-    private void updateAlbumList(List<String> albums) {
+    public void playAlbum(Path albumPath) {
+        try {
+            playbackService.playAlbum(albumPath);
+        } catch (Exception e) {
+            ExceptionHandler.handle(e, "playing album");
+        }
+    }
+
+    public String albumPathToDisplayString(Path albumPath) {
+        return albumService.albumPathToDisplayString(albumPath);
+    }
+
+    public void updateAlbumList(List<Path> albums) {
         albumListView.getItems().setAll(albums);
     }
 }

@@ -1,14 +1,15 @@
 package com.musimizer.repository;
 
 import com.musimizer.exception.MusicDirectoryException;
-import com.musimizer.util.FileSystemManager;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * File-based implementation of AlbumRepository that stores album data on the filesystem.
@@ -16,75 +17,86 @@ import java.util.stream.Stream;
  */
 
 public class FileAlbumRepository implements AlbumRepository {
+    public FileAlbumRepository() {
+        // No-op constructor since we're using static FileSystemManager methods
+    }
+
     @Override
-    public List<String> loadAlbumPicks(Path savedPicksFile, Path exclusionFile) {
+    public List<Path> loadAlbumPicks(Path savedPicksFile) {
         try {
-            if (FileSystemManager.exists(savedPicksFile)) {
-                return FileSystemManager.readAllLines(savedPicksFile);
+            if (Files.exists(savedPicksFile)) {
+                return Files.readAllLines(savedPicksFile).stream()
+                        .map(Path::of)
+                        .collect(Collectors.toList());
             }
             return Collections.emptyList();
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new MusicDirectoryException("Failed to load album picks", e);
         }
     }
 
     @Override
-    public void saveAlbumPicks(Path file, List<String> albumPicks) {
+    public void saveAlbumPicks(Path file, List<Path> albumPicks) {
         try {
-            FileSystemManager.writeAllLines(file, albumPicks);
-        } catch (Exception e) {
+            List<String> pathsAsStrings = albumPicks.stream()
+                    .map(Path::toString)
+                    .collect(Collectors.toList());
+            Files.write(file, pathsAsStrings);
+        } catch (IOException e) {
             throw new MusicDirectoryException("Failed to save album picks", e);
         }
     }
 
     @Override
-    public Set<String> loadExcludedAlbums(Path exclusionFile) {
+    public Set<Path> loadExcludedAlbums(Path musicDirectory, Path exclusionFile) {
         try {
-            if (FileSystemManager.exists(exclusionFile)) {
-                return new HashSet<>(FileSystemManager.readAllLines(exclusionFile));
-            }
-            return new HashSet<>();
-        } catch (Exception e) {
+            if (!Files.exists(exclusionFile))
+                return Set.of();
+            return Files.readAllLines(exclusionFile).stream()
+                    .map(musicDirectory::resolve)
+                    .collect(Collectors.toSet());
+        } catch (IOException e) {
             throw new MusicDirectoryException("Failed to load excluded albums", e);
         }
     }
 
     @Override
-    public void saveExcludedAlbums(Path exclusionFile, Set<String> excludedAlbums) {
+    public void saveExcludedAlbums(Path musicDirectory, Path exclusionFile, Collection<Path> excludedAlbums) {
         try {
-            FileSystemManager.writeAllLines(exclusionFile, new ArrayList<>(excludedAlbums));
-        } catch (Exception e) {
+            // Convert excludedAlbums to String paths relative to musicDir
+            var pathsAsStrings = excludedAlbums.stream()
+                    .map(musicDirectory::relativize)
+                    .map(Path::toString)
+                    .map(pathString -> StringUtils.replace(pathString, File.separator, "/"))
+                    .collect(Collectors.toList());
+            Files.write(exclusionFile, pathsAsStrings);
+        } catch (IOException e) {
             throw new MusicDirectoryException("Failed to save excluded albums", e);
         }
     }
 
     @Override
-    public List<String> findAllAlbums(Path musicDir) {
-        if (!FileSystemManager.exists(musicDir) || !FileSystemManager.isDirectory(musicDir)) {
+    public List<Path> findAllAlbums(Path musicDir) {
+        if (!Files.exists(musicDir) || !Files.isDirectory(musicDir)) {
             throw new MusicDirectoryException("Music directory does not exist or is not accessible: " + musicDir);
         }
 
         try (Stream<Path> artistDirs = Files.list(musicDir)) {
-            // Collect results into a list immediately to avoid stream reuse issues
             return artistDirs
-                .filter(Files::isDirectory)
-                .flatMap(this::getAlbumsForArtist)
-                .collect(Collectors.toList());
+                    .filter(Files::isDirectory)
+                    .flatMap(artistDir -> {
+                        try (Stream<Path> albumDirs = Files.list(artistDir)) {
+                            return albumDirs
+                                    .filter(Files::isDirectory)
+                                    .map(Path::toAbsolutePath)
+                                    .collect(Collectors.toList()).stream();
+                        } catch (IOException e) {
+                            throw new MusicDirectoryException("Failed to read artist directory: " + artistDir, e);
+                        }
+                    })
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             throw new MusicDirectoryException("Failed to list albums in directory: " + musicDir, e);
-        }
-    }
-
-    private Stream<String> getAlbumsForArtist(Path artistDir) {
-        try (Stream<Path> albumDirs = Files.list(artistDir)) {
-            // Collect results into a list first to avoid stream reuse issues
-            List<String> albums = albumDirs
-                .filter(Files::isDirectory)
-                .map(albumDir -> artistDir.getFileName() + " - " + albumDir.getFileName())
-                .collect(Collectors.toList());
-            return albums.stream();
-        } catch (IOException e) {
-            throw new MusicDirectoryException("Failed to read artist directory: " + artistDir, e);
         }
     }
 }
