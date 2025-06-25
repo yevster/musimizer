@@ -40,7 +40,7 @@ class FileAlbumRepositoryTest {
         
         album1 = artist1.resolve("Album 1 (2020)");
         album2 = artist1.resolve("Album no. 2 [Special Edition]");
-        album3 = artist2.resolve("Album_ The Third");
+        album3 = artist2.resolve("Album_ The Third!");
         
         Files.createDirectories(album1);
         Files.createDirectories(album2);
