@@ -176,7 +176,6 @@ public class AppUI {
         private final Label albumLabel = new Label();
         private final Button excludeButton = new Button();
         private final Button folderButton = new Button();
-        private final Button playButton = new Button();
         private final HBox hbox = new HBox();
         
         public AlbumListCell() {
@@ -185,7 +184,7 @@ public class AppUI {
         }
         
         private void setupCell() {
-            hbox.getChildren().addAll(albumLabel, folderButton, playButton, excludeButton);
+            hbox.getChildren().addAll(albumLabel, folderButton, excludeButton);
             hbox.setSpacing(10);
             HBox.setHgrow(albumLabel, Priority.ALWAYS);
             albumLabel.setMaxWidth(Double.MAX_VALUE);
@@ -193,7 +192,6 @@ public class AppUI {
             hbox.setStyle("-fx-alignment: center-left;");
             
             setupFolderButton();
-            setupPlayButton();
             setupExcludeButton();
             
             setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
@@ -221,41 +219,6 @@ public class AppUI {
                         LOGGER.log(Level.SEVERE, "Error opening album folder", ex);
                         showError("Error", "Could not open folder", 
                             "Error opening album folder: " + ex.getMessage());
-                    }
-                }
-            });
-        }
-        
-        private void setupPlayButton() {
-            SVGPath playIcon = new SVGPath();
-            playIcon.setContent("M8 5v14l11-7z");
-            playIcon.setStyle("-fx-fill: #4CAF50;");
-            playIcon.setScaleX(1.2);
-            playIcon.setScaleY(1.2);
-            playButton.setGraphic(playIcon);
-            playButton.setPrefSize(20, 20);
-            playButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
-            playButton.setTooltip(new Tooltip("Play album"));
-            
-            playButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
-                playButton.setStyle(
-                    "-fx-background-color: " + (isNowHovered ? "#e8f5e9;" : "transparent;") + 
-                    " -fx-padding: 2;" + 
-                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
-            });
-            
-            playButton.setOnAction(e -> {
-                String album = getItem();
-                if (album != null) {
-                    try {
-                        // Get the controller from the scene's root
-                        BorderPane root = (BorderPane) getScene().getRoot();
-                        AppController controller = (AppController) root.getUserData();
-                        controller.playAlbum(album);
-                    } catch (Exception ex) {
-                        LOGGER.log(Level.SEVERE, "Error playing album", ex);
-                        showError("Error", "Could not play album", 
-                            "Error playing album: " + ex.getMessage());
                     }
                 }
             });

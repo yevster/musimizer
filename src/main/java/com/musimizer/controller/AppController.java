@@ -1,7 +1,6 @@
 package com.musimizer.controller;
 
 import com.musimizer.service.AlbumService;
-import com.musimizer.service.PlaybackService;
 import com.musimizer.repository.AlbumRepository;
 import com.musimizer.repository.FileAlbumRepository;
 import com.musimizer.ui.dialogs.SettingsDialog;
@@ -21,7 +20,6 @@ import java.util.Optional;
 public class AppController {
     private final Stage stage;
     private final AlbumService albumService;
-    private final PlaybackService playbackService;
     private final ListView<String> albumListView;
     private final Button pickButton;
     private final Button backButton;
@@ -40,7 +38,6 @@ public class AppController {
         Path exclusionFile = SettingsManager.getExclusionFilePath();
         AlbumRepository albumRepository = new FileAlbumRepository();
         this.albumService = new AlbumService(albumRepository, musicDir, exclusionFile);
-        this.playbackService = new PlaybackService();
         
         initialize();
     }
@@ -167,11 +164,12 @@ public class AppController {
         try {
             albumService.generateNewPicks(SettingsManager.getNumberOfPicks());
             updateAlbumList(albumService.getCurrentPicks());
-            titleLabel.setText(DEFAULT_TITLE);
+            pickButton.setVisible(true);
             backButton.setVisible(false);
+            titleLabel.setText(DEFAULT_TITLE);
         } catch (Exception e) {
             boolean openSettings = ExceptionHandler.showConfirmation(
-                "Error",
+                "Music Directory Error",
                 "Error generating album picks",
                 e.getMessage() + "\n\nWould you like to open settings to correct this?"
             ).filter(buttonType -> buttonType == ButtonType.OK).isPresent();
@@ -179,18 +177,6 @@ public class AppController {
             if (openSettings) {
                 showSettingsDialog();
             }
-        }
-    }
-    
-    /**
-     * Plays the specified album using the default media player.
-     * @param albumPath The path of the album to play in the format "Artist - Album"
-     */
-    public void playAlbum(String albumPath) {
-        try {
-            playbackService.playAlbum(albumPath);
-        } catch (Exception e) {
-            ExceptionHandler.handle(e, "playing album");
         }
     }
     
