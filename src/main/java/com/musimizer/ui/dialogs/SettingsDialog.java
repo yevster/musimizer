@@ -1,5 +1,6 @@
-package com.musimizer;
+package com.musimizer.ui.dialogs;
 
+import com.musimizer.util.SettingsManager;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.stage.DirectoryChooser;
@@ -24,6 +25,7 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
 
     public SettingsDialog(Window owner) {
         setTitle("Settings");
+        initOwner(owner);
         
         // Load current settings
         String currentDir = SettingsManager.getMusicDir();
@@ -33,57 +35,21 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
         
         // Music directory controls
         Label dirLabel = new Label("Music Collection Directory:");
         TextField dirField = new TextField(currentDir != null ? currentDir : "");
+        dirField.setPrefWidth(400);
         Button browse = new Button("Browse...");
         
         // Number of picks controls
         Label picksLabel = new Label("Number of Picks:");
-        Spinner<Integer> picksSpinner = new Spinner<>(1, 100, currentPicks);
-        picksSpinner.setEditable(true);
+        Spinner<Integer> picksSpinner = createNumberSpinner(1, 100, currentPicks);
         
         // Number of search results controls
         Label searchResultsLabel = new Label("Number of Search Results:");
-        Spinner<Integer> searchResultsSpinner = new Spinner<>(1, 100, currentSearchResults);
-        searchResultsSpinner.setEditable(true);
-        
-        // Set up the spinners to only accept numbers
-        SpinnerValueFactory.IntegerSpinnerValueFactory picksFactory = 
-            (SpinnerValueFactory.IntegerSpinnerValueFactory) picksSpinner.getValueFactory();
-        picksFactory.setConverter(new IntegerStringConverter() {
-            @Override
-            public Integer fromString(String s) {
-                try {
-                    return super.fromString(s);
-                } catch (NumberFormatException e) {
-                    return picksSpinner.getValue();
-                }
-            }
-        });
-        
-        SpinnerValueFactory.IntegerSpinnerValueFactory searchResultsFactory = 
-            (SpinnerValueFactory.IntegerSpinnerValueFactory) searchResultsSpinner.getValueFactory();
-        searchResultsFactory.setConverter(new IntegerStringConverter() {
-            @Override
-            public Integer fromString(String s) {
-                try {
-                    return super.fromString(s);
-                } catch (NumberFormatException e) {
-                    return searchResultsSpinner.getValue();
-                }
-            }
-        });
-        
-        // If there's a current directory, set it as the initial directory for the chooser
-        if (currentDir != null && !currentDir.isEmpty()) {
-            File currentDirFile = new File(currentDir);
-            if (currentDirFile.exists() && currentDirFile.isDirectory()) {
-                DirectoryChooser chooser = new DirectoryChooser();
-                chooser.setInitialDirectory(currentDirFile);
-            }
-        }
+        Spinner<Integer> searchResultsSpinner = createNumberSpinner(1, 100, currentSearchResults);
         
         // Add components to grid
         grid.add(dirLabel, 0, 0);
@@ -98,6 +64,15 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         browse.setOnAction(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("Select Music Collection Directory");
+            
+            // Set initial directory if one exists
+            if (currentDir != null && !currentDir.isEmpty()) {
+                File currentDirFile = new File(currentDir);
+                if (currentDirFile.exists() && currentDirFile.isDirectory()) {
+                    chooser.setInitialDirectory(currentDirFile);
+                }
+            }
+            
             File selected = chooser.showDialog(owner);
             if (selected != null) {
                 dirField.setText(selected.getAbsolutePath());
@@ -138,9 +113,35 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         setResultConverter(btn -> {
             if (btn == ButtonType.OK) {
                 String dirPath = dirField.getText().trim();
-                return new Settings(dirPath, picksSpinner.getValue(), searchResultsSpinner.getValue());
+                return new Settings(
+                    dirPath,
+                    picksSpinner.getValue(),
+                    searchResultsSpinner.getValue()
+                );
             }
             return null;
         });
+    }
+    
+    private Spinner<Integer> createNumberSpinner(int min, int max, int initialValue) {
+        Spinner<Integer> spinner = new Spinner<>(min, max, initialValue);
+        spinner.setEditable(true);
+        
+        // Configure the spinner to handle invalid input
+        SpinnerValueFactory.IntegerSpinnerValueFactory factory = 
+            (SpinnerValueFactory.IntegerSpinnerValueFactory) spinner.getValueFactory();
+            
+        factory.setConverter(new IntegerStringConverter() {
+            @Override
+            public Integer fromString(String s) {
+                try {
+                    return super.fromString(s);
+                } catch (NumberFormatException e) {
+                    return spinner.getValue();
+                }
+            }
+        });
+        
+        return spinner;
     }
 }
