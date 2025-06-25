@@ -12,7 +12,7 @@ public class AlbumService {
     private final Path musicDir;
     private final Path exclusionFile;
     private final Path savedPicksFile;
-    private final Set<Path> excludedAlbums;
+    private Set<Path> excludedAlbums;
     private List<Path> currentPicks;
 
     public AlbumService(AlbumRepository albumRepository, Path musicDir, Path exclusionFile) {
@@ -20,7 +20,7 @@ public class AlbumService {
         this.musicDir = musicDir;
         this.exclusionFile = exclusionFile;
         this.savedPicksFile = exclusionFile.getParent().resolve("saved_picks.txt");
-        this.excludedAlbums = new HashSet<>();
+        this.excludedAlbums = new LinkedHashSet<>();
         this.currentPicks = new ArrayList<>();
         
         loadExcludedAlbums();
@@ -28,8 +28,7 @@ public class AlbumService {
 
     public void loadExcludedAlbums() {
         try {
-            excludedAlbums.clear();
-            excludedAlbums.addAll(albumRepository.loadExcludedAlbums(musicDir, exclusionFile));
+            excludedAlbums = albumRepository.loadExcludedAlbums(musicDir, exclusionFile);
         } catch (Exception e) {
             throw new MusicDirectoryException("Failed to load excluded albums", e);
         }

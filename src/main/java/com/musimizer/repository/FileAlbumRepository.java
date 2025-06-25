@@ -9,7 +9,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * File-based implementation of AlbumRepository that stores album data on the filesystem.
@@ -54,7 +53,7 @@ public class FileAlbumRepository implements AlbumRepository {
                 return Set.of();
             return Files.readAllLines(exclusionFile).stream()
                     .map(musicDirectory::resolve)
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toCollection(()->new LinkedHashSet<Path>()));
         } catch (IOException e) {
             throw new MusicDirectoryException("Failed to load excluded albums", e);
         }
@@ -67,7 +66,7 @@ public class FileAlbumRepository implements AlbumRepository {
             var pathsAsStrings = excludedAlbums.stream()
                     .map(musicDirectory::relativize)
                     .map(Path::toString)
-                    .map(pathString -> StringUtils.replace(pathString, File.separator, "/"))
+                    .map(pathString -> pathString.replace(File.separator, "/"))
                     .collect(Collectors.toList());
             Files.write(exclusionFile, pathsAsStrings);
         } catch (IOException e) {

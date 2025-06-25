@@ -5,7 +5,6 @@ module com.musimizer {
     requires java.logging;
     requires java.prefs;
     requires java.desktop;
-    requires org.apache.commons.lang3;
     
     // Export all our packages
     exports com.musimizer;
