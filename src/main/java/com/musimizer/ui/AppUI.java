@@ -230,7 +230,7 @@ public class AppUI {
             HBox.setHgrow(albumLabel, Priority.ALWAYS);
             albumLabel.setMaxWidth(Double.MAX_VALUE);
             hbox.setFillHeight(true);
-            hbox.setStyle("-fx-alignment: center-left;");
+            hbox.setStyle("-fx-alignment: center;");
             
             setupFolderButton();
             setupExcludeButton(albumListView);
@@ -245,11 +245,18 @@ public class AppUI {
             folderIcon.setContent(
                 "M3 7V5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.41.59l1.83 1.82H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm2 0h14v8H5V7z");
             folderIcon.setStyle("-fx-fill: #d5bd1f;");
-            folderIcon.setScaleX(0.9);
-            folderIcon.setScaleY(0.9);
+            folderIcon.setScaleX(1.0);
+            folderIcon.setScaleY(1.0);
             folderButton.setGraphic(folderIcon);
             folderButton.setPrefSize(20, 20);
-            folderButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand;");
+            folderButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
+            folderButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
+                folderButton.setStyle(
+                    "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") +
+                    " -fx-padding: 0;" +
+                    " -fx-cursor: hand;" +
+                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+            });
             folderButton.setTooltip(new Tooltip("Open album folder"));
             
             folderButton.setOnAction(e -> {
@@ -279,13 +286,14 @@ public class AppUI {
             noEntryIcon.setScaleX(0.7);
             noEntryIcon.setScaleY(0.7);
             excludeButton.setGraphic(noEntryIcon);
-            excludeButton.setPrefSize(28, 28);
+            excludeButton.setPrefSize(20, 20);
             excludeButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-opacity: 0.7;");
             
             excludeButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
                 excludeButton.setStyle(
                     "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") + 
                     " -fx-padding: 2;" + 
+                    " -fx-cursor: hand;" +
                     " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
             });
             excludeButton.setTooltip(new Tooltip("Exclude this album"));
@@ -303,11 +311,18 @@ public class AppUI {
             SVGPath playIcon = new SVGPath();
             playIcon.setContent("M8 5v14l11-7z"); // SVG path for a play triangle
             playIcon.setStyle("-fx-fill: green;");
-            playIcon.setScaleX(0.8);
-            playIcon.setScaleY(0.8);
+            playIcon.setScaleX(1.0);
+            playIcon.setScaleY(1.0);
             playButton.setGraphic(playIcon);
             playButton.setPrefSize(20, 20);
-            playButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand;");
+            playButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
+            playButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
+                playButton.setStyle(
+                    "-fx-background-color: " + (isNowHovered ? "#deffee;" : "transparent;") +
+                    " -fx-padding: 0;" +
+                    " -fx-cursor: hand;" +
+                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+            });
             playButton.setTooltip(new Tooltip("Play album"));
 
             playButton.setOnAction(e -> {
