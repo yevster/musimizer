@@ -142,15 +142,10 @@ public class AppController {
         
         try {
             List<Path> searchResults = albumService.searchAlbums(searchTerms, SettingsManager.getNumberOfSearchResults());
-            if (searchResults.isEmpty()) {
-                updateAlbumList(Collections.emptyList()); // Clear the list
-                // Optionally, show a message in a Label or Dialog
-            } else {
-                updateAlbumList(searchResults);
-                pickButton.setVisible(false);
-                backButton.setVisible(true);
-                titleLabel.setText("Search Results for: " + keywords);
-            }
+            updateAlbumList(searchResults);
+            pickButton.setVisible(false);
+            backButton.setVisible(true);
+            titleLabel.setText((searchResults.isEmpty() ? "No " : "") + "Search Results for: " + keywords);
         } catch (Exception e) {
             ExceptionHandler.handle(e, "searching albums");
         }
