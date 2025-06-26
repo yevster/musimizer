@@ -4,7 +4,7 @@ Musimizer selects random albums from your music collection. It only works if the
 
 When you first run it, it will ask you for the location of your music collection. This should be the folder that has artist folders inside it.
 
-After that, it will show you a random list of albums. If you don't want to listen to a particular album or have already listened to it, click the box to the right of the album, and Musimizer will never show it to you again.
+After that, it will show you a random list of albums. If you don't want to listen to a particular album or have already listened to it, click the Exclude button to the right of the album, and Musimizer will never show it to you again.
 
 ---
 
