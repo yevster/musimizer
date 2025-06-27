@@ -1,27 +1,28 @@
 package com.musimizer.controller;
 
-import com.musimizer.service.AlbumService;
-import com.musimizer.service.PlaybackService;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Optional;
+
 import com.musimizer.repository.AlbumRepository;
 import com.musimizer.repository.FileAlbumRepository;
+import com.musimizer.service.AlbumService;
+import com.musimizer.service.PlaybackService;
 import com.musimizer.ui.dialogs.SettingsDialog;
 import com.musimizer.util.ExceptionHandler;
 import com.musimizer.util.SettingsManager;
+
 import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.stage.Stage;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 
 public class AppController {
     private final Stage stage;
-    private final AlbumService albumService;
+    private AlbumService albumService;
     private final PlaybackService playbackService;
     private final ListView<Path> albumListView;
     private final Button pickButton;
@@ -29,20 +30,15 @@ public class AppController {
     private final Label titleLabel;
     private static final String DEFAULT_TITLE = "Randomly Selected Albums";
 
-    public AppController(Stage primaryStage, ListView<Path> albumListView, Button pickButton, Button backButton, Label titleLabel) {
+    public AppController(Stage primaryStage, ListView<Path> albumListView, Button pickButton, Button backButton,
+            Label titleLabel) {
         this.stage = primaryStage;
         this.albumListView = albumListView;
         this.pickButton = pickButton;
         this.backButton = backButton;
         this.titleLabel = titleLabel;
-        
-        // Initialize services
-        Path musicDir = Paths.get(SettingsManager.getMusicDir());
-        Path exclusionFile = SettingsManager.getExclusionFilePath();
-        AlbumRepository albumRepository = new FileAlbumRepository();
-        this.albumService = new AlbumService(albumRepository, musicDir, exclusionFile);
+
         this.playbackService = new PlaybackService();
-        
 
     }
 
@@ -51,40 +47,44 @@ public class AppController {
         if (musicDir == null || musicDir.isEmpty()) {
             Platform.runLater(this::showSettingsDialog);
         } else {
-            initializeAlbumPicker();
+            initializeWithSettings();
         }
     }
-    
+
     public void reinitializeWithNewSettings() {
         String musicDir = SettingsManager.getMusicDir();
         if (musicDir != null && !musicDir.isEmpty()) {
-            initializeAlbumPicker();
+            initializeWithSettings();
         }
     }
 
     public AlbumService getAlbumService() {
         return albumService;
     }
-    
-    private void initializeAlbumPicker() {
+
+    private void initializeWithSettings() {
         try {
+            var albumRepository = new FileAlbumRepository();
+            albumService = new AlbumService(albumRepository, Paths.get(SettingsManager.getMusicDir()),
+                    SettingsManager.getExclusionFilePath());
             albumService.loadExcludedAlbums();
             albumService.loadSavedPicks();
-            
+
             if (albumService.getCurrentPicks().isEmpty()) {
                 albumService.generateNewPicks(SettingsManager.getNumberOfPicks());
             }
-            
+
             updateAlbumList(albumService.getCurrentPicks());
             titleLabel.setText(DEFAULT_TITLE);
-            
+
         } catch (Exception e) {
             ExceptionHandler.handle(e, "initializing album picker");
         }
     }
 
     /**
-     * Shows the settings dialog and updates the application settings if valid settings are provided.
+     * Shows the settings dialog and updates the application settings if valid
+     * settings are provided.
      * This method is public to allow access from UI components.
      */
     public void showSettingsDialog() {
@@ -94,30 +94,30 @@ public class AppController {
             if (result.isPresent()) {
                 SettingsDialog.Settings settings = result.get();
                 boolean needsReinitialization = false;
-                
+
                 // Update music directory if changed
-                if (settings.musicDir != null && !settings.musicDir.isEmpty() 
+                if (settings.musicDir != null && !settings.musicDir.isEmpty()
                         && !settings.musicDir.equals(SettingsManager.getMusicDir())) {
                     SettingsManager.setMusicDir(settings.musicDir);
                     needsReinitialization = true;
                 }
-                
+
                 // Update number of picks if changed
                 if (settings.numberOfPicks != SettingsManager.getNumberOfPicks()) {
                     SettingsManager.setNumberOfPicks(settings.numberOfPicks);
                 }
-                
+
                 // Update number of search results if changed
                 if (settings.numberOfSearchResults != SettingsManager.getNumberOfSearchResults()) {
                     SettingsManager.setNumberOfSearchResults(settings.numberOfSearchResults);
                 }
-                
+
                 // Reinitialize if music directory was changed
                 if (needsReinitialization) {
-                    initializeAlbumPicker();
+                    initializeWithSettings();
                 }
             }
-            
+
             // Exit if no music directory is set
             if (SettingsManager.getMusicDir() == null || SettingsManager.getMusicDir().isEmpty()) {
                 Platform.exit();
@@ -136,12 +136,12 @@ public class AppController {
     }
 
     public void showSearchResults(List<String> searchTerms, String keywords) {
-        if (searchTerms == null || searchTerms.isEmpty()) {
+        if (searchTerms == null || searchTerms.isEmpty())
             return;
-        }
-        
+
         try {
-            List<Path> searchResults = albumService.searchAlbums(searchTerms, SettingsManager.getNumberOfSearchResults());
+            List<Path> searchResults = albumService.searchAlbums(searchTerms,
+                    SettingsManager.getNumberOfSearchResults());
             updateAlbumList(searchResults);
             pickButton.setVisible(false);
             backButton.setVisible(true);
@@ -150,7 +150,7 @@ public class AppController {
             ExceptionHandler.handle(e, "searching albums");
         }
     }
-    
+
     public void showRandomPicks() {
         Platform.runLater(() -> {
             updateAlbumList(albumService.getCurrentPicks());
@@ -159,7 +159,7 @@ public class AppController {
             titleLabel.setText(DEFAULT_TITLE);
         });
     }
-    
+
     public void pickAlbums() {
         try {
             albumService.generateNewPicks(SettingsManager.getNumberOfPicks());
@@ -169,17 +169,16 @@ public class AppController {
             titleLabel.setText(DEFAULT_TITLE);
         } catch (Exception e) {
             boolean openSettings = ExceptionHandler.showConfirmation(
-                "Music Directory Error",
-                "Error generating album picks",
-                e.getMessage() + "\n\nWould you like to open settings to correct this?"
-            ).filter(buttonType -> buttonType == ButtonType.OK).isPresent();
-            
-            if (openSettings) {
+                    "Music Directory Error",
+                    "Error generating album picks",
+                    e.getMessage() + "\n\nWould you like to open settings to correct this?")
+                    .filter(buttonType -> buttonType == ButtonType.OK).isPresent();
+
+            if (openSettings)
                 showSettingsDialog();
-            }
         }
     }
-    
+
     public void playAlbum(Path albumPath) {
         try {
             playbackService.playAlbum(albumPath);

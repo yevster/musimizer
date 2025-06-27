@@ -16,8 +16,8 @@ import java.util.stream.Stream;
  */
 
 public class FileAlbumRepository implements AlbumRepository {
+    private List<Path> allAlbums = null;
     public FileAlbumRepository() {
-        // No-op constructor since we're using static FileSystemManager methods
     }
 
     @Override
@@ -80,8 +80,11 @@ public class FileAlbumRepository implements AlbumRepository {
             throw new MusicDirectoryException("Music directory does not exist or is not accessible: " + musicDir);
         }
 
+        if (allAlbums != null) 
+            return allAlbums;
+
         try (Stream<Path> artistDirs = Files.list(musicDir)) {
-            return artistDirs
+            allAlbums = artistDirs
                     .filter(Files::isDirectory)
                     .flatMap(artistDir -> {
                         try (Stream<Path> albumDirs = Files.list(artistDir)) {
@@ -94,6 +97,7 @@ public class FileAlbumRepository implements AlbumRepository {
                         }
                     })
                     .collect(Collectors.toList());
+            return allAlbums;
         } catch (IOException e) {
             throw new MusicDirectoryException("Failed to list albums in directory: " + musicDir, e);
         }
