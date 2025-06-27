@@ -12,15 +12,15 @@ public class AlbumService {
     private final Path musicDir;
     private final Path exclusionFile;
     private final Path savedPicksFile;
-    private final Set<String> excludedAlbums;
-    private List<String> currentPicks;
+    private Set<Path> excludedAlbums;
+    private List<Path> currentPicks;
 
     public AlbumService(AlbumRepository albumRepository, Path musicDir, Path exclusionFile) {
         this.albumRepository = albumRepository;
         this.musicDir = musicDir;
         this.exclusionFile = exclusionFile;
         this.savedPicksFile = exclusionFile.getParent().resolve("saved_picks.txt");
-        this.excludedAlbums = new HashSet<>();
+        this.excludedAlbums = new LinkedHashSet<>();
         this.currentPicks = new ArrayList<>();
         
         loadExcludedAlbums();
@@ -28,8 +28,7 @@ public class AlbumService {
 
     public void loadExcludedAlbums() {
         try {
-            excludedAlbums.clear();
-            excludedAlbums.addAll(albumRepository.loadExcludedAlbums(exclusionFile));
+            excludedAlbums = albumRepository.loadExcludedAlbums(musicDir, exclusionFile);
         } catch (Exception e) {
             throw new MusicDirectoryException("Failed to load excluded albums", e);
         }
@@ -37,15 +36,15 @@ public class AlbumService {
 
     public void loadSavedPicks() {
         try {
-            currentPicks = albumRepository.loadAlbumPicks(savedPicksFile, exclusionFile);
+            currentPicks = albumRepository.loadAlbumPicks(savedPicksFile);
         } catch (Exception e) {
             throw new MusicDirectoryException("Failed to load saved picks", e);
         }
     }
 
     public void generateNewPicks(int numberOfPicks) {
-        List<String> allAlbums = findAllAlbums();
-        List<String> eligibleAlbums = allAlbums.stream()
+        List<Path> allAlbums = findAllAlbums();
+        List<Path> eligibleAlbums = allAlbums.stream()
                 .filter(album -> !excludedAlbums.contains(album))
                 .collect(Collectors.toList());
 
@@ -61,26 +60,26 @@ public class AlbumService {
         saveCurrentPicks();
     }
 
-    public void excludeAlbum(String albumPath) {
+    public void excludeAlbum(Path albumPath) {
         excludedAlbums.add(albumPath);
         currentPicks.remove(albumPath);
         saveExcludedAlbums();
         saveCurrentPicks();
     }
 
-    public List<String> searchAlbums(List<String> searchTerms, int maxResults) {
+    public List<Path> searchAlbums(List<String> searchTerms, int maxResults) {
         if (searchTerms == null || searchTerms.isEmpty() || maxResults <= 0) {
             return Collections.emptyList();
         }
 
-        List<String> allAlbums = findAllAlbums();
-        List<String> searchResults = allAlbums.stream()
+        List<Path> allAlbums = findAllAlbums();
+        List<Path> searchResults = allAlbums.stream()
                 .filter(album -> !excludedAlbums.contains(album))
                 .filter(album -> {
-                    String albumLower = album.toLowerCase();
+                    String searchableAlbum = albumPathToDisplayString(album).toLowerCase();
                     return searchTerms.stream()
                             .map(String::toLowerCase)
-                            .allMatch(albumLower::contains);
+                            .allMatch(searchableAlbum::contains);
                 })
                 .collect(Collectors.toList());
 
@@ -88,7 +87,7 @@ public class AlbumService {
         return searchResults.subList(0, Math.min(maxResults, searchResults.size()));
     }
 
-    private List<String> findAllAlbums() {
+    private List<Path> findAllAlbums() {
         try {
             return albumRepository.findAllAlbums(musicDir);
         } catch (Exception e) {
@@ -98,7 +97,7 @@ public class AlbumService {
 
     private void saveExcludedAlbums() {
         try {
-            albumRepository.saveExcludedAlbums(exclusionFile, excludedAlbums);
+            albumRepository.saveExcludedAlbums(musicDir, exclusionFile, excludedAlbums);
         } catch (Exception e) {
             throw new MusicDirectoryException("Failed to save excluded albums", e);
         }
@@ -112,11 +111,22 @@ public class AlbumService {
         }
     }
 
-    public List<String> getCurrentPicks() {
+    public List<Path> getCurrentPicks() {
         return Collections.unmodifiableList(currentPicks);
     }
 
-    public Set<String> getExcludedAlbums() {
+    public String albumPathToDisplayString(Path albumPath) {
+        if (albumPath == null) {
+            return "";
+        }
+        Path artistDir = albumPath.getParent();
+        if (artistDir == null) {
+            return albumPath.getFileName().toString();
+        }
+        return artistDir.getFileName().toString() + " - " + albumPath.getFileName().toString();
+    }
+
+    public Set<Path> getExcludedAlbums() {
         return Collections.unmodifiableSet(excludedAlbums);
     }
 }

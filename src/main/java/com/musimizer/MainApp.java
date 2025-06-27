@@ -5,6 +5,7 @@ import com.musimizer.util.ExceptionHandler;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import com.musimizer.controller.AppController;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 
@@ -38,6 +39,10 @@ public class MainApp extends Application {
             Scene scene = new Scene(root, 800, 650);
             primaryStage.setScene(scene);
             primaryStage.show();
+
+            // Initialize the controller after the stage is shown to ensure Scene is available
+            AppController controller = (AppController) root.getUserData();
+            controller.initialize();
             
         } catch (Exception e) {
             // Handle any startup errors

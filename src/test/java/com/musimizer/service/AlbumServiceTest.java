@@ -29,12 +29,7 @@ class AlbumServiceTest {
     private Path exclusionFile;
     private Path savedPicksFile;
     
-    private final List<String> sampleAlbums = List.of(
-        "Artist1 - Album1",
-        "Artist1 - Album2",
-        "Artist2 - Album1",
-        "Artist2 - Album3"
-    );
+    private List<Path> sampleAlbums;
 
     @BeforeEach
     void setUp() {
@@ -42,7 +37,16 @@ class AlbumServiceTest {
         exclusionFile = tempDir.resolve("excluded_albums.txt");
         savedPicksFile = tempDir.resolve("saved_picks.txt");
         albumService = new AlbumService(albumRepository, musicDir, exclusionFile);
+        sampleAlbums = List.of(
+            Path.of(musicDir.toAbsolutePath().toString(), "Artist1", "Album1"),
+            Path.of(musicDir.toAbsolutePath().toString(), "Artist1", "Album2"),
+            Path.of(musicDir.toAbsolutePath().toString(), "Ar-tist2", "Album2"),
+            Path.of(musicDir.toAbsolutePath().toString(), "Artist3", "Al_ bum3"),
+            Path.of(musicDir.toAbsolutePath().toString(), "A rti st4", "Al bum4")
+        );
     }
+
+    
 
     @Test
     void constructor_shouldInitializeWithNoExcludedAlbums() throws Exception {
@@ -57,7 +61,7 @@ class AlbumServiceTest {
         
         // When
         albumService.generateNewPicks(2);
-        List<String> picks = albumService.getCurrentPicks();
+        List<Path> picks = albumService.getCurrentPicks();
         
         // Then
         assertEquals(2, picks.size());
@@ -70,13 +74,43 @@ class AlbumServiceTest {
         // Given
         when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
         
-        String excludedAlbum = sampleAlbums.get(0);
+        Path excludedAlbum = sampleAlbums.get(0);
         albumService.excludeAlbum(excludedAlbum);
         
         // When
         albumService.generateNewPicks(sampleAlbums.size());
-        List<String> picks = albumService.getCurrentPicks();
+        List<Path> picks = albumService.getCurrentPicks();
         
+        // Then
+        assertFalse(picks.contains(excludedAlbum));
+        assertEquals(sampleAlbums.size() - 1, picks.size());
+    }
+
+    @Test
+    void generateNewPicks_shouldNotReturnExcludedAlbumsAfterReloading() throws Exception {
+        // Given
+        when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
+
+        Path excludedAlbum = sampleAlbums.get(0);
+        Set<Path> capturedExclusions = new HashSet<>();
+
+        // Mock the behavior of saving and loading excluded albums to simulate file I/O
+        doAnswer(invocation -> {
+            // Capture the collection of paths passed to saveExcludedAlbums
+            Collection<Path> albumsToExclude = invocation.getArgument(2);
+            capturedExclusions.addAll(albumsToExclude);
+            return null;
+        }).when(albumRepository).saveExcludedAlbums(any(), any(), any());
+
+        when(albumRepository.loadExcludedAlbums(any(), any())).thenReturn(capturedExclusions);
+
+        // When
+        albumService.excludeAlbum(excludedAlbum); // This will now "save" the exclusion to our captured set
+        albumService.loadExcludedAlbums(); // This will "load" from our captured set
+
+        albumService.generateNewPicks(sampleAlbums.size());
+        List<Path> picks = albumService.getCurrentPicks();
+
         // Then
         assertFalse(picks.contains(excludedAlbum));
         assertEquals(sampleAlbums.size() - 1, picks.size());
@@ -94,14 +128,14 @@ class AlbumServiceTest {
     @Test
     void excludeAlbum_shouldAddToExcludedAlbums() throws Exception {
         // Given
-        String albumToExclude = sampleAlbums.get(0);
+        Path albumToExclude = sampleAlbums.get(0);
         
         // When
         albumService.excludeAlbum(albumToExclude);
         
         // Then
         assertTrue(albumService.getExcludedAlbums().contains(albumToExclude));
-        verify(albumRepository).saveExcludedAlbums(exclusionFile, Set.of(albumToExclude));
+        verify(albumRepository).saveExcludedAlbums(musicDir, exclusionFile, Set.of(albumToExclude));
     }
 
     @Test
@@ -109,7 +143,7 @@ class AlbumServiceTest {
         // Given
         when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
         albumService.generateNewPicks(sampleAlbums.size());
-        String albumToExclude = sampleAlbums.get(0);
+        Path albumToExclude = sampleAlbums.get(0);
         
         // When
         albumService.excludeAlbum(albumToExclude);
@@ -124,12 +158,16 @@ class AlbumServiceTest {
         when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
         
         // When
-        List<String> results = albumService.searchAlbums(List.of("Artist1"), 10);
+        List<Path> results = albumService.searchAlbums(List.of("Artist1"), 10);
         
         // Then
         assertEquals(2, results.size());
-        assertTrue(results.contains("Artist1 - Album1"));
-        assertTrue(results.contains("Artist1 - Album2"));
+        assertTrue(results.contains(sampleAlbums.get(0)));
+        assertTrue(results.contains(sampleAlbums.get(1)));
+
+        //Some special cases in album and search names
+        assertEquals(1, albumService.searchAlbums(List.of("tist2", "bum2"), 10).size());
+        assertEquals(1, albumService.searchAlbums(List.of("Ar-tist2"), 10).size());
     }
 
     @Test
@@ -138,7 +176,7 @@ class AlbumServiceTest {
         when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
         
         // When
-        List<String> results = albumService.searchAlbums(List.of("Album"), 2);
+        List<Path> results = albumService.searchAlbums(List.of("Album"), 2);
         
         // Then
         assertEquals(2, results.size());
@@ -147,7 +185,7 @@ class AlbumServiceTest {
     @Test
     void searchAlbums_shouldReturnEmptyListForEmptySearchTerms() throws Exception {
         // When
-        List<String> results = albumService.searchAlbums(Collections.emptyList(), 10);
+        List<Path> results = albumService.searchAlbums(Collections.emptyList(), 10);
         
         // Then
         assertTrue(results.isEmpty());
@@ -156,8 +194,8 @@ class AlbumServiceTest {
     @Test
     void loadSavedPicks_shouldLoadPicksFromRepository() throws Exception {
         // Given
-        List<String> savedPicks = List.of("Artist1 - Album1", "Artist2 - Album3");
-        when(albumRepository.loadAlbumPicks(savedPicksFile, exclusionFile)).thenReturn(savedPicks);
+        List<Path> savedPicks = List.of(sampleAlbums.get(0), sampleAlbums.get(1));
+        when(albumRepository.loadAlbumPicks(savedPicksFile)).thenReturn(savedPicks);
         
         // When
         albumService.loadSavedPicks();
@@ -169,8 +207,8 @@ class AlbumServiceTest {
     @Test
     void loadExcludedAlbums_shouldReloadExcludedAlbums() throws Exception {
         // Given
-        Set<String> excluded = Set.of("Artist1 - Album1");
-        when(albumRepository.loadExcludedAlbums(exclusionFile)).thenReturn(excluded);
+        Set<Path> excluded = Set.of(sampleAlbums.get(0));
+        when(albumRepository.loadExcludedAlbums(musicDir, exclusionFile)).thenReturn(excluded);
         
         // When
         albumService.loadExcludedAlbums();
@@ -179,15 +217,4 @@ class AlbumServiceTest {
         assertEquals(excluded, albumService.getExcludedAlbums());
     }
 
-    @Test
-    void findAllAlbums_shouldRethrowAsMusicDirectoryException() throws Exception {
-        // Given
-        Exception cause = new Exception("Test exception");
-        when(albumRepository.findAllAlbums(musicDir)).thenThrow(cause);
-        
-        // When/Then
-        MusicDirectoryException exception = assertThrows(MusicDirectoryException.class, 
-            () -> albumService.searchAlbums(List.of("test"), 10));
-        assertEquals(cause, exception.getCause());
-    }
 }

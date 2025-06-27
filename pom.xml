@@ -9,7 +9,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.musimizer</groupId>
     <artifactId>musimizer</artifactId>
-    <version>1.0.9-SNAPSHOT</version>
+    <version>1.0.10-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Musimizer</name>
     <description>Random Album Picker for Music Collections</description>
@@ -87,13 +87,6 @@
             <artifactId>logback-classic</artifactId>
             <version>1.4.7</version>
         </dependency>
-        
-        <!-- Apache Commons -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.12.0</version>
-        </dependency>
     </dependencies>
 
     <profiles>
@@ -113,6 +106,10 @@
                 <version>3.11.0</version>
                 <configuration>
                     <release>21</release>
+                    <compilerArgs>
+                        <arg>--add-modules</arg>
+                        <arg>javafx.controls,javafx.fxml,javafx.graphics,javafx.base</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>
