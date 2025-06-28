@@ -21,7 +21,7 @@ public class ImageUtils {
      * @param targetHeight The target height of the image (use 0 to use image's original height)
      * @return A JavaFX Image, or null if the image could not be created
      */
-    public static Image createImageFromBytes(byte[] imageData, double targetWidth, double targetHeight) {
+public static Image createImageFromBytes(byte[] imageData, double targetWidth, double targetHeight) {
         if (imageData == null || imageData.length == 0) {
             LOGGER.warning("Cannot create image: image data is null or empty");
             return null;
