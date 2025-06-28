@@ -3,6 +3,13 @@ package com.musimizer.ui;
 import com.musimizer.controller.AppController;
 
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 
@@ -21,8 +28,12 @@ import java.nio.file.Path;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.musimizer.util.AlbumArtExtractor;
 
 public class AppUI {
     private static final Logger LOGGER = Logger.getLogger(AppUI.class.getName());
@@ -66,6 +77,8 @@ public class AppUI {
     private static ListView<Path> createAlbumListView() {
         ListView<Path> albumListView = new ListView<>();
         albumListView.setCellFactory(lv -> new AlbumListCell(albumListView));
+        albumListView.setFixedCellSize(40);
+        albumListView.setStyle("-fx-cell-size: 40px;");
         return albumListView;
     }
     
@@ -190,12 +203,24 @@ public class AppUI {
     
     private static class AlbumListCell extends ListCell<Path> {
         private static final Logger LOGGER = Logger.getLogger(AlbumListCell.class.getName());
+        private static final int IMAGE_SIZE = 36; // Slightly smaller than row height for padding
+        private static final ExecutorService executorService = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "AlbumArtLoader");
+            t.setDaemon(true);
+            return t;
+        });
+        
+        private final ImageView albumArtView = new ImageView();
         private final Label albumLabel = new Label();
         private final Button excludeButton = new Button();
         private final Button folderButton = new Button();
         private final Button playButton = new Button();
         private final HBox hbox = new HBox();
         private AppController controller;
+        private Path currentItem;
+        
+        // Default album art to show when no art is found
+        private static final Image DEFAULT_ALBUM_ART = createDefaultAlbumArt();
 
         public AlbumListCell(ListView<Path> albumListView) {
             super();
@@ -206,10 +231,15 @@ public class AppUI {
         protected void updateItem(Path item, boolean empty) {
             super.updateItem(item, empty);
 
+            // Clear previous item
+            currentItem = null;
+            albumArtView.setImage(DEFAULT_ALBUM_ART);
+            
             if (empty || item == null) {
                 setGraphic(null);
                 setText(null);
             } else {
+                currentItem = item;
                 if (controller == null) {
                     controller = (AppController) getScene().getRoot().getUserData();
                 }
@@ -221,17 +251,78 @@ public class AppUI {
                 folderButton.setVisible(true);
                 excludeButton.setVisible(true);
                 playButton.setVisible(true);
+                
+                // Load album art asynchronously
+                loadAlbumArt(item);
             }
         }
         
+        private void loadAlbumArt(Path albumPath) {
+            // Set default image first
+            albumArtView.setImage(DEFAULT_ALBUM_ART);
+            
+            // Skip if the cell has been reused for a different item
+            if (!albumPath.equals(currentItem)) {
+                return;
+            }
+            
+            // Load album art in background
+            executorService.submit(() -> {
+                try {
+                    AlbumArtExtractor.getAlbumArt(albumPath).ifPresent(image -> {
+                        // Check again if the cell hasn't been reused
+                        if (albumPath.equals(currentItem)) {
+                            javafx.application.Platform.runLater(() -> {
+                                if (albumPath.equals(currentItem)) {
+                                    albumArtView.setImage(image);
+                                }
+                            });
+                        }
+                    });
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Error loading album art for " + albumPath, e);
+                }
+            });
+        }
+        
+        private static Image createDefaultAlbumArt() {
+            // Create a simple default album art
+            WritableImage image = new WritableImage(IMAGE_SIZE, IMAGE_SIZE);
+            PixelWriter writer = image.getPixelWriter();
+            for (int x = 0; x < IMAGE_SIZE; x++) {
+                for (int y = 0; y < IMAGE_SIZE; y++) {
+                    // Create a simple gradient background
+                    Color color = Color.rgb(200, 200, 200);
+                    writer.setColor(x, y, color);
+                }
+            }
+            return image;
+        }
+        
         private void setupCell(ListView<Path> albumListView) {
-            hbox.getChildren().addAll(albumLabel, folderButton, excludeButton, playButton);
+            // Configure album art view
+            albumArtView.setFitWidth(IMAGE_SIZE);
+            albumArtView.setFitHeight(IMAGE_SIZE);
+            albumArtView.setPreserveRatio(true);
+            albumArtView.setSmooth(true);
+            albumArtView.setImage(DEFAULT_ALBUM_ART);
+            
+            // Add all components to HBox
+            hbox.getChildren().addAll(albumArtView, albumLabel, folderButton, excludeButton, playButton);
             hbox.setSpacing(10);
+            hbox.setAlignment(Pos.CENTER_LEFT);
+            hbox.setPadding(new Insets(2));
+            
+            // Make sure the album art has a fixed width and the label takes remaining space
             HBox.setHgrow(albumLabel, Priority.ALWAYS);
             albumLabel.setMaxWidth(Double.MAX_VALUE);
-            hbox.setFillHeight(true);
-            hbox.setStyle("-fx-alignment: center;");
+            albumLabel.setAlignment(Pos.CENTER_LEFT);
+            albumLabel.setContentDisplay(ContentDisplay.LEFT);
             
+            // Set fixed height for the cell
+            setPrefHeight(40);
+            
+            // Set up buttons
             setupFolderButton();
             setupExcludeButton(albumListView);
             setupPlayButton();

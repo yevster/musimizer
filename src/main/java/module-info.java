@@ -5,6 +5,7 @@ module com.musimizer {
     requires java.logging;
     requires java.prefs;
     requires java.desktop;
+    requires mp3agic;
     
     // Export all our packages
     exports com.musimizer;
