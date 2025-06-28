@@ -6,10 +6,7 @@ import com.musimizer.util.AudioMetadataRetriever;
 
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.Alert.AlertType;
-import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -28,14 +25,10 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
-import javafx.stage.Modality;
-import javafx.stage.Screen;
-import javafx.stage.Stage;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Rectangle;
-import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+
+import com.musimizer.ui.dialogs.AlbumArtDialog;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,20 +43,21 @@ import java.util.logging.Logger;
 
 public class AppUI {
     private static final Logger LOGGER = Logger.getLogger(AppUI.class.getName());
+
     public static BorderPane createRootPane(Stage primaryStage) {
         BorderPane root = new BorderPane();
 
         // Main content
         ListView<Path> albumListView = createAlbumListView();
-        
+
         // Create menu
         MenuBar menuBar = createMenuBar(albumListView, primaryStage);
-        
+
         // Buttons
         Button pickButton = createPickButton();
         Button backButton = createBackButton();
         HBox buttonBox = new HBox(10, pickButton, backButton);
-        
+
         // Main content area with title and album list
         Label titleLabel = new Label("Randomly Selected Albums");
         VBox vbox = new VBox(10);
@@ -76,59 +70,60 @@ public class AppUI {
         // Initialize controller
         AppController controller = new AppController(primaryStage, albumListView, pickButton, backButton, titleLabel);
         root.setUserData(controller);
-        
+
         // Set up button actions
         pickButton.setOnAction(e -> controller.pickAlbums());
         backButton.setOnAction(e -> controller.showRandomPicks());
-        
+
         // Add key handler to the scene
         setupEscapeKeyHandler(primaryStage, controller);
 
         return root;
     }
-    
+
     private static ListView<Path> createAlbumListView() {
         ListView<Path> albumListView = new ListView<>();
         albumListView.setCellFactory(lv -> new AlbumListCell(albumListView));
         return albumListView;
     }
-    
+
     private static MenuBar createMenuBar(ListView<Path> albumList, Stage primaryStage) {
         MenuBar menuBar = new MenuBar();
-        
+
         // File menu
         Menu fileMenu = new Menu("File");
         MenuItem settingsItem = new MenuItem("Settings...");
         settingsItem.setOnAction(e -> showSettings(primaryStage));
-        
+
         MenuItem showExclusionsItem = new MenuItem("Show Exclusion List...");
         showExclusionsItem.setOnAction(e -> showExclusionList(primaryStage));
         fileMenu.getItems().addAll(settingsItem, showExclusionsItem);
-        
+
         // Edit menu
         Menu editMenu = new Menu("Edit");
         MenuItem findItem = new MenuItem("Find...");
         findItem.setAccelerator(KeyCombination.keyCombination("shortcut+F"));
-        findItem.setOnAction(e -> showFindDialog(albumList, (AppController) ((BorderPane) primaryStage.getScene().getRoot()).getUserData()));
+        findItem.setOnAction(e -> showFindDialog(albumList,
+                (AppController) ((BorderPane) primaryStage.getScene().getRoot()).getUserData()));
         editMenu.getItems().add(findItem);
-        
+
         menuBar.getMenus().addAll(fileMenu, editMenu);
         return menuBar;
     }
-    
+
     private static Button createPickButton() {
         Button button = new Button("Pick New Random Selections");
         button.setStyle("-fx-base: #2196F3; -fx-text-fill: white;");
         return button;
     }
-    
+
     private static Button createBackButton() {
         Button button = new Button("Back to Random Picks");
         button.setStyle("-fx-base: #FF9800; -fx-text-fill: white;");
         button.setVisible(false);
         return button;
     }
-    
+
     private static void setupEscapeKeyHandler(Stage stage, AppController controller) {
         Scene scene = stage.getScene();
         if (scene == null) {
@@ -141,7 +136,7 @@ public class AppUI {
             addEscapeHandler(scene, controller);
         }
     }
-    
+
     private static void addEscapeHandler(Scene scene, AppController controller) {
         scene.addEventHandler(KeyEvent.KEY_RELEASED, event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
@@ -149,19 +144,20 @@ public class AppUI {
             }
         });
     }
-    
+
     private static void showSettings(Stage owner) {
         AppController controller = (AppController) ((BorderPane) owner.getScene().getRoot()).getUserData();
         controller.showSettingsDialog();
     }
-    
+
     private static void showExclusionList(Stage owner) {
         Path exclusionFile = com.musimizer.util.SettingsManager.getExclusionFilePath();
         if (exclusionFile != null) {
             try {
                 com.musimizer.util.SettingsManager.ensureExclusionFileExists();
             } catch (IOException e) {
-                showError("Error", "Cannot ensure file exists", "Failed to ensure exclusion file exists: " + e.getMessage());
+                showError("Error", "Cannot ensure file exists",
+                        "Failed to ensure exclusion file exists: " + e.getMessage());
                 return; // Exit if file creation fails
             }
 
@@ -178,7 +174,7 @@ public class AppUI {
             showError("Error", "File not found", "Exclusion file does not exist or path is invalid.");
         }
     }
-    
+
     private static void showFindDialog(ListView<Path> albumList, AppController controller) {
         TextInputDialog dialog = new TextInputDialog();
         dialog.initStyle(StageStyle.UTILITY);
@@ -192,7 +188,7 @@ public class AppUI {
             controller.showSearchResults(searchTerms, terms);
         });
     }
-    
+
     public static void showError(String title, String header, String content) {
         LOGGER.log(Level.SEVERE, title + ": " + content);
 
@@ -202,7 +198,7 @@ public class AppUI {
         alert.setContentText(content);
         alert.showAndWait();
     }
-    
+
     public static boolean showErrorWithOptions(String title, String header, String content) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle(title);
@@ -211,12 +207,12 @@ public class AppUI {
         Optional<ButtonType> result = alert.showAndWait();
         return result.isPresent() && result.get() == ButtonType.OK;
     }
-    
+
     private static class AlbumListCell extends ListCell<Path> {
         private static final Logger LOGGER = Logger.getLogger(AlbumListCell.class.getName());
         private static final ExecutorService executorService = Executors.newCachedThreadPool();
         private static final Image DEFAULT_ALBUM_ART = createDefaultAlbumArt();
-        
+
         private final ImageView albumArtView = new ImageView(DEFAULT_ALBUM_ART);
         private final Label albumLabel = new Label();
         private byte[] currentAlbumArtData;
@@ -225,12 +221,12 @@ public class AppUI {
         private final Button playButton = new Button();
         private final HBox hbox = new HBox();
         private AppController controller;
-        
+
         private static Image createDefaultAlbumArt() {
             // Create a simple default album art
             Rectangle rect = new Rectangle(40, 40);
             rect.setFill(Color.DARKGRAY);
-            
+
             return rect.snapshot(null, null);
         }
 
@@ -250,13 +246,13 @@ public class AppUI {
                 if (controller == null) {
                     controller = (AppController) getScene().getRoot().getUserData();
                 }
-                
+
                 // Set album name
                 albumLabel.setText(controller.getAlbumService().albumPathToDisplayString(item));
-                
+
                 // Load album art in background
                 loadAlbumArt(item);
-                
+
                 setGraphic(hbox);
                 setText(null); // Important: set text to null if using graphic
 
@@ -266,227 +262,112 @@ public class AppUI {
                 playButton.setVisible(true);
             }
         }
-        
-        private void showFullSizeAlbumArt(byte[] imageData) {
-            if (imageData == null) return;
-            
-            try {
-                // Create a dialog
-                Dialog<Void> dialog = new Dialog<>();
-                dialog.initModality(Modality.APPLICATION_MODAL);
-                dialog.initStyle(StageStyle.UTILITY);
-                dialog.setResizable(false);
-                dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
-                
-                // Create image view for the dialog
-                ImageView fullSizeView = new ImageView();
-                fullSizeView.setPreserveRatio(true);
-                fullSizeView.setSmooth(true);
-                
-                // Create image from byte array
-                Image img = new Image(new java.io.ByteArrayInputStream(imageData));
-                fullSizeView.setImage(img);
-                
-                // Set initial size to fit screen if image is too large
-                Screen screen = Screen.getPrimary();
-                double maxHeight = screen.getVisualBounds().getHeight() * 0.8; // 80% of screen height
-                double maxWidth = Math.min(maxHeight, screen.getVisualBounds().getWidth() * 0.8);  // Same as screen height, if possible.
 
-                
-                if (img.getWidth() > maxWidth || img.getHeight() > maxHeight) {
-                    double scale = Math.min(maxWidth / img.getWidth(), maxHeight / img.getHeight());
-                    fullSizeView.setFitWidth(img.getWidth() * scale);
-                    fullSizeView.setFitHeight(img.getHeight() * scale);
-                } else {
-                    fullSizeView.setFitWidth(img.getWidth());
-                    fullSizeView.setFitHeight(img.getHeight());
-                }
-                
-                // Allow zooming with mouse wheel
-                fullSizeView.setOnScroll(event -> {
-                    double zoomFactor = 1.1;
-                    double deltaY = event.getDeltaY();
-                    
-                    if (deltaY < 0) {
-                        zoomFactor = 1.0 / zoomFactor;
-                    }
-                    
-                    double newWidth = fullSizeView.getFitWidth() * zoomFactor;
-                    double newHeight = fullSizeView.getFitHeight() * zoomFactor;
-                    
-                    // Limit zoom out to original size
-                    if (newWidth >= img.getWidth() || deltaY > 0) {
-                        fullSizeView.setFitWidth(newWidth);
-                        fullSizeView.setFitHeight(newHeight);
-                    } else {
-                        fullSizeView.setFitWidth(img.getWidth());
-                        fullSizeView.setFitHeight(img.getHeight());
-                    }
-                    
-                    event.consume();
-                });
-                
-                // Add drag support
-                final double[] dragStart = new double[2];
-                fullSizeView.setOnMousePressed(event -> {
-                    if (event.isSecondaryButtonDown()) {
-                        dragStart[0] = event.getSceneX();
-                        dragStart[1] = event.getSceneY();
-                    }
-                });
-                
-                fullSizeView.setOnMouseDragged(event -> {
-                    if (event.isSecondaryButtonDown()) {
-                        double deltaX = event.getSceneX() - dragStart[0];
-                        double deltaY = event.getSceneY() - dragStart[1];
-                        
-                        // Move the dialog
-                        dialog.getDialogPane().getScene().getWindow().setX(
-                            dialog.getDialogPane().getScene().getWindow().getX() + deltaX);
-                        dialog.getDialogPane().getScene().getWindow().setY(
-                            dialog.getDialogPane().getScene().getWindow().getY() + deltaY);
-                        
-                        dragStart[0] = event.getSceneX();
-                        dragStart[1] = event.getSceneY();
-                        event.consume();
-                    }
-                });
-                
-                // Double-click to reset zoom
-                fullSizeView.setOnMouseClicked(event -> {
-                    if (event.getClickCount() == 2) {
-                        if (img.getWidth() > maxWidth || img.getHeight() > maxHeight) {
-                            double scale = Math.min(maxWidth / img.getWidth(), maxHeight / img.getHeight());
-                            fullSizeView.setFitWidth(img.getWidth() * scale);
-                            fullSizeView.setFitHeight(img.getHeight() * scale);
-                        } else {
-                            fullSizeView.setFitWidth(img.getWidth());
-                            fullSizeView.setFitHeight(img.getHeight());
-                        }
-                    }
-                });
-                
-                // Add to dialog
-                StackPane pane = new StackPane(fullSizeView);
-                pane.setPadding(new javafx.geometry.Insets(10));
-                dialog.getDialogPane().setContent(pane);
-                
-                // Set dialog size
-                dialog.getDialogPane().setPrefSize(
-                    Math.min(img.getWidth() + 40, maxWidth + 40),
-                    Math.min(img.getHeight() + 40, maxHeight + 40)
-                );
-                
-                // Show dialog
+        private void showFullSizeAlbumArt(byte[] imageData) {
+            if (imageData == null)
+                return;
+
+            try {
+                // Create and show the album art dialog
+                AlbumArtDialog dialog = new AlbumArtDialog(
+                        getScene().getWindow(),
+                        imageData);
                 dialog.showAndWait();
-                
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Failed to display full size album art", e);
             }
         }
-        
+
         private void handleAlbumArtClick(MouseEvent event) {
             if (currentAlbumArtData != null) {
                 showFullSizeAlbumArt(currentAlbumArtData);
             }
         }
-        
+
         private void loadAlbumArt(Path albumPath) {
             LOGGER.fine("Loading album art for: " + albumPath);
             // Reset to default art while loading
             albumArtView.setImage(DEFAULT_ALBUM_ART);
-            
+
             // Load in background to avoid UI freezing
             executorService.submit(() -> {
                 try {
                     AlbumService albumService = controller.getAlbumService();
                     LOGGER.fine("Finding first audio file in: " + albumPath);
                     Optional<Path> audioFileOpt = albumService.findFirstAudioFile(albumPath);
-                    
-                    if (audioFileOpt.isPresent()) {
-                        Path audioFile = audioFileOpt.get();
-                        LOGGER.fine("Found audio file: " + audioFile);
-                        try {
-                            LOGGER.fine("Attempting to extract cover image from: " + audioFile);
-                            byte[] imageData = AudioMetadataRetriever.getCoverImage(audioFile);
-                            LOGGER.fine("Cover image extraction " + (imageData != null ? "succeeded" : "failed"));
-                            
-                            if (imageData != null) {
-                                currentAlbumArtData = imageData; // Store the image data for full-size view
-                                LOGGER.fine("Cover image size: " + imageData.length + " bytes");
-                                // Create image on JavaFX Application Thread
-                                javafx.application.Platform.runLater(() -> {
-                                    try {
-                                        LOGGER.fine("Creating JavaFX Image from byte array");
-                                        try {
-                                            // Create image directly from byte array
-                                            Image img = ImageUtils.createImageFromBytes(imageData, 40, 40);
-                                            
-                                            if (img != null) {
-                                                LOGGER.fine("Successfully created image, dimensions: " + 
-                                                    img.getWidth() + "x" + img.getHeight());
-                                                
-                                                // Update the UI on the JavaFX Application Thread
-                                                javafx.application.Platform.runLater(() -> {
-                                        albumArtView.setImage(img);
-                                                });
-                                            } else {
-                                                throw new IOException("Failed to create image from byte array");
-                                            }
-                                            
-                                    } catch (Exception e) {
-                                        LOGGER.log(Level.WARNING, "Failed to create Image: " + e.getMessage(), e);
-                                        // Update UI on JavaFX Application Thread
-                                        javafx.application.Platform.runLater(() -> {
-                                            albumArtView.setImage(DEFAULT_ALBUM_ART);
-                                        });
-                                        }
-                                    } catch (Exception e) {
-                                        LOGGER.log(Level.WARNING, "Failed to load album art", e);
-                                        albumArtView.setImage(DEFAULT_ALBUM_ART);
-                                    }
-                                });
-                            } else {
-                                LOGGER.fine("No cover art found in: " + audioFile);
-                            }
-                        } catch (Exception e) {
-                            LOGGER.log(Level.WARNING, "Error extracting album art from: " + audioFile, e);
-                        }
-                    } else {
+
+                    if (!audioFileOpt.isPresent()) {
                         LOGGER.fine("No audio files found in: " + albumPath);
+                        return;
+                    }
+
+                    Path audioFile = audioFileOpt.get();
+                    LOGGER.fine("Found audio file: " + audioFile);
+                    
+                    try {
+                        LOGGER.fine("Attempting to extract cover image from: " + audioFile);
+                        byte[] imageData = AudioMetadataRetriever.getCoverImage(audioFile);
+                        LOGGER.fine("Cover image extraction " + (imageData != null ? "succeeded" : "failed"));
+
+                        if (imageData == null) 
+                            return;
+                        
+                        currentAlbumArtData = imageData; // Store the image data for full-size view
+                        LOGGER.fine("Cover image size: " + imageData.length + " bytes");
+
+                        // Create and update the image on the JavaFX Application Thread
+                        javafx.application.Platform.runLater(() -> {
+                            try {
+                                LOGGER.fine("Creating JavaFX Image from byte array");
+                                Image img = ImageUtils.createImageFromBytes(imageData, 40, 40);
+                                
+                                if (img != null) {
+                                    LOGGER.fine("Successfully created image, dimensions: " +
+                                            img.getWidth() + "x" + img.getHeight());
+                                    albumArtView.setImage(img);
+                                } else 
+                                    throw new IOException("Failed to create image from byte array");
+                                
+                            } catch (Exception e) {
+                                LOGGER.log(Level.WARNING, "Failed to create/display album art: " + e.getMessage(), e);
+                                albumArtView.setImage(DEFAULT_ALBUM_ART);
+                            }
+                        });
+                    } catch (Exception e) {
+                        LOGGER.log(Level.WARNING, "Error extracting album art from: " + audioFile, e);
                     }
                 } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "Error loading album art for: " + albumPath, e);
+                    LOGGER.log(Level.WARNING, "Error finding audio file in: " + albumPath, e);
                 }
             });
         }
-        
+
         private void setupCell(ListView<Path> albumListView) {
             setupAlbumArtView();
 
             // Add some padding and spacing
-            hbox.setSpacing(5);
-            hbox.setPadding(new javafx.geometry.Insets(5));
-            
+            hbox.setSpacing(10);
+            hbox.setPadding(new javafx.geometry.Insets(2,15,2,2));
+
             // Add all components to the HBox
             hbox.getChildren().addAll(albumArtView, albumLabel, folderButton, excludeButton, playButton);
-            
+
             // Configure layout
             HBox.setHgrow(albumLabel, Priority.ALWAYS);
             albumLabel.setMaxWidth(Double.MAX_VALUE);
             hbox.setFillHeight(true);
             hbox.setStyle("-fx-alignment: center-left;");
-            
+
             // Setup buttons
             setupFolderButton();
             setupExcludeButton(albumListView);
             setupPlayButton();
-            
+
             setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
             setGraphic(hbox);
         }
 
-        private void setupAlbumArtView(){
+        private void setupAlbumArtView() {
             // Configure album art view
             albumArtView.setFitWidth(40);
             albumArtView.setFitHeight(40);
@@ -496,26 +377,27 @@ public class AppUI {
             albumArtView.setStyle(" -fx-cursor: hand;");
 
         }
-        
+
         private void setupFolderButton() {
             SVGPath folderIcon = new SVGPath();
             folderIcon.setContent(
-                "M3 7V5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.41.59l1.83 1.82H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm2 0h14v8H5V7z");
+                    "M3 7V5a2 2 0 0 1 2-2h3.17a2 2 0 0 1 1.41.59l1.83 1.82H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm2 0h14v8H5V7z");
             folderIcon.setStyle("-fx-fill: #d5bd1f;");
             folderIcon.setScaleX(1.0);
             folderIcon.setScaleY(1.0);
             folderButton.setGraphic(folderIcon);
             folderButton.setPrefSize(20, 20);
-            folderButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
+            folderButton
+                    .setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
             folderButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
                 folderButton.setStyle(
-                    "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") +
-                    " -fx-padding: 0;" +
-                    " -fx-cursor: hand;" +
-                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+                        "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") +
+                                " -fx-padding: 0;" +
+                                " -fx-cursor: hand;" +
+                                " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
             });
             folderButton.setTooltip(new Tooltip("Open album folder"));
-            
+
             folderButton.setOnAction(e -> {
                 Path albumPath = getItem();
                 if (albumPath != null) {
@@ -523,47 +405,48 @@ public class AppUI {
                         openAlbumFolder(albumPath);
                     } catch (Exception ex) {
                         LOGGER.log(Level.SEVERE, "Error opening album folder", ex);
-                        showError("Error", "Could not open folder", 
-                            "Error opening album folder: " + ex.getMessage());
+                        showError("Error", "Could not open folder",
+                                "Error opening album folder: " + ex.getMessage());
                     }
                 }
             });
         }
-        
+
         private void setupExcludeButton(ListView<Path> albumListView) {
             SVGPath noEntryIcon = new SVGPath();
             noEntryIcon.setContent(
-                "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" +
-                "M5 5l14 14");
+                    "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" +
+                            "M5 5l14 14");
             noEntryIcon.setStyle(
-                "-fx-fill: #ffffff;" +
-                "-fx-stroke: #ff0000;" +
-                "-fx-stroke-width: 3.5;" +
-                "-fx-stroke-linecap: round;");
+                    "-fx-fill: #ffffff;" +
+                            "-fx-stroke: #ff0000;" +
+                            "-fx-stroke-width: 3.5;" +
+                            "-fx-stroke-linecap: round;");
             noEntryIcon.setScaleX(0.7);
             noEntryIcon.setScaleY(0.7);
             excludeButton.setGraphic(noEntryIcon);
             excludeButton.setPrefSize(20, 20);
             excludeButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-opacity: 0.7;");
-            
+
             excludeButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
                 excludeButton.setStyle(
-                    "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") + 
-                    " -fx-padding: 2;" + 
-                    " -fx-cursor: hand;" +
-                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+                        "-fx-background-color: " + (isNowHovered ? "#ffeeee;" : "transparent;") +
+                                " -fx-padding: 2;" +
+                                " -fx-cursor: hand;" +
+                                " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
             });
             excludeButton.setTooltip(new Tooltip("Exclude this album"));
-            excludeButton.setOnAction(e -> {    
+            excludeButton.setOnAction(e -> {
                 Path albumPath = getItem();
-                if (albumPath == null)return;
+                if (albumPath == null)
+                    return;
                 AppController controller = (AppController) getScene().getRoot().getUserData();
                 controller.excludeAlbum(albumPath);
                 // Remove only this album from the list viewAdd commentMore actions
                 albumListView.getItems().remove(albumPath);
             });
         }
-        
+
         private void setupPlayButton() {
             SVGPath playIcon = new SVGPath();
             playIcon.setContent("M8 5v14l11-7z"); // SVG path for a play triangle
@@ -572,13 +455,14 @@ public class AppUI {
             playIcon.setScaleY(1.0);
             playButton.setGraphic(playIcon);
             playButton.setPrefSize(20, 20);
-            playButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
+            playButton
+                    .setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
             playButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
                 playButton.setStyle(
-                    "-fx-background-color: " + (isNowHovered ? "#deffee;" : "transparent;") +
-                    " -fx-padding: 0;" +
-                    " -fx-cursor: hand;" +
-                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+                        "-fx-background-color: " + (isNowHovered ? "#deffee;" : "transparent;") +
+                                " -fx-padding: 0;" +
+                                " -fx-cursor: hand;" +
+                                " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
             });
             playButton.setTooltip(new Tooltip("Play album"));
 
@@ -606,6 +490,6 @@ public class AppUI {
                 throw new IOException("Album directory does not exist: " + dir);
             }
         }
-        
+
     }
 }
