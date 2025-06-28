@@ -1,26 +1,31 @@
 package com.musimizer.ui;
 
 import com.musimizer.controller.AppController;
+import com.musimizer.service.AlbumService;
+import com.musimizer.util.AudioMetadataRetriever;
 
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
-
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import java.util.Arrays;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -190,12 +195,24 @@ public class AppUI {
     
     private static class AlbumListCell extends ListCell<Path> {
         private static final Logger LOGGER = Logger.getLogger(AlbumListCell.class.getName());
+        private static final ExecutorService executorService = Executors.newCachedThreadPool();
+        private static final Image DEFAULT_ALBUM_ART = createDefaultAlbumArt();
+        
+        private final ImageView albumArtView = new ImageView();
         private final Label albumLabel = new Label();
         private final Button excludeButton = new Button();
         private final Button folderButton = new Button();
         private final Button playButton = new Button();
         private final HBox hbox = new HBox();
         private AppController controller;
+        
+        private static Image createDefaultAlbumArt() {
+            // Create a simple default album art
+            Rectangle rect = new Rectangle(40, 40);
+            rect.setFill(Color.DARKGRAY);
+            
+            return rect.snapshot(null, null);
+        }
 
         public AlbumListCell(ListView<Path> albumListView) {
             super();
@@ -213,7 +230,13 @@ public class AppUI {
                 if (controller == null) {
                     controller = (AppController) getScene().getRoot().getUserData();
                 }
+                
+                // Set album name
                 albumLabel.setText(controller.getAlbumService().albumPathToDisplayString(item));
+                
+                // Load album art in background
+                loadAlbumArt(item);
+                
                 setGraphic(hbox);
                 setText(null); // Important: set text to null if using graphic
 
@@ -224,14 +247,103 @@ public class AppUI {
             }
         }
         
+        private void loadAlbumArt(Path albumPath) {
+            LOGGER.fine("Loading album art for: " + albumPath);
+            // Reset to default art while loading
+            albumArtView.setImage(DEFAULT_ALBUM_ART);
+            
+            // Load in background to avoid UI freezing
+            executorService.submit(() -> {
+                try {
+                    AlbumService albumService = controller.getAlbumService();
+                    LOGGER.fine("Finding first audio file in: " + albumPath);
+                    Optional<Path> audioFileOpt = albumService.findFirstAudioFile(albumPath);
+                    
+                    if (audioFileOpt.isPresent()) {
+                        Path audioFile = audioFileOpt.get();
+                        LOGGER.fine("Found audio file: " + audioFile);
+                        try {
+                            LOGGER.fine("Attempting to extract cover image from: " + audioFile);
+                            byte[] imageData = AudioMetadataRetriever.getCoverImage(audioFile);
+                            LOGGER.fine("Cover image extraction " + (imageData != null ? "succeeded" : "failed"));
+                            
+                            if (imageData != null) {
+                                LOGGER.fine("Cover image size: " + imageData.length + " bytes");
+                                // Create image on JavaFX Application Thread
+                                javafx.application.Platform.runLater(() -> {
+                                    try {
+                                        LOGGER.fine("Creating JavaFX Image from byte array");
+                                        try {
+                                            // Try to determine image type for logging
+                                            String imageType = ImageUtils.detectImageType(imageData);
+                                            LOGGER.fine("Creating image from memory, detected type: " + 
+                                                (imageType != null ? imageType : "unknown"));
+                                            
+                                            // Create image directly from byte array
+                                            Image img = ImageUtils.createImageFromBytes(imageData, 40, 40);
+                                            
+                                            if (img != null) {
+                                                LOGGER.fine("Successfully created image, dimensions: " + 
+                                                    img.getWidth() + "x" + img.getHeight());
+                                                
+                                                // Update the UI on the JavaFX Application Thread
+                                                javafx.application.Platform.runLater(() -> {
+                                                    albumArtView.setImage(img);
+                                                });
+                                            } else {
+                                                throw new IOException("Failed to create image from byte array");
+                                            }
+                                            
+                                        } catch (Exception e) {
+                                            LOGGER.log(Level.WARNING, "Failed to create Image: " + e.getMessage(), e);
+                                            // Update UI on JavaFX Application Thread
+                                            javafx.application.Platform.runLater(() -> {
+                                                albumArtView.setImage(DEFAULT_ALBUM_ART);
+                                            });
+                                        }
+                                    } catch (Exception e) {
+                                        LOGGER.log(Level.WARNING, "Failed to load album art", e);
+                                        albumArtView.setImage(DEFAULT_ALBUM_ART);
+                                    }
+                                });
+                            } else {
+                                LOGGER.fine("No cover art found in: " + audioFile);
+                            }
+                        } catch (Exception e) {
+                            LOGGER.log(Level.WARNING, "Error extracting album art from: " + audioFile, e);
+                        }
+                    } else {
+                        LOGGER.fine("No audio files found in: " + albumPath);
+                    }
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Error loading album art for: " + albumPath, e);
+                }
+            });
+        }
+        
         private void setupCell(ListView<Path> albumListView) {
-            hbox.getChildren().addAll(albumLabel, folderButton, excludeButton, playButton);
+            // Configure album art view
+            albumArtView.setFitWidth(40);
+            albumArtView.setFitHeight(40);
+            albumArtView.setImage(DEFAULT_ALBUM_ART);
+            albumArtView.setPreserveRatio(true);
+            albumArtView.setSmooth(true);
+            albumArtView.setCache(true);
+            
+            // Add some padding and spacing
             hbox.setSpacing(10);
+            hbox.setPadding(new javafx.geometry.Insets(5));
+            
+            // Add all components to the HBox
+            hbox.getChildren().addAll(albumArtView, albumLabel, folderButton, excludeButton, playButton);
+            
+            // Configure layout
             HBox.setHgrow(albumLabel, Priority.ALWAYS);
             albumLabel.setMaxWidth(Double.MAX_VALUE);
             hbox.setFillHeight(true);
-            hbox.setStyle("-fx-alignment: center;");
+            hbox.setStyle("-fx-alignment: center-left;");
             
+            // Setup buttons
             setupFolderButton();
             setupExcludeButton(albumListView);
             setupPlayButton();

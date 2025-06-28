@@ -3,9 +3,13 @@ package com.musimizer.service;
 import com.musimizer.exception.MusicDirectoryException;
 import com.musimizer.repository.AlbumRepository;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class AlbumService {
     private final AlbumRepository albumRepository;
@@ -128,5 +132,44 @@ public class AlbumService {
 
     public Set<Path> getExcludedAlbums() {
         return Collections.unmodifiableSet(excludedAlbums);
+    }
+    
+    /**
+     * Finds the first audio file in the specified album directory.
+     * @param albumPath The path to the album directory
+     * @return An Optional containing the path to the first audio file, or empty if none found
+     */
+    public Optional<Path> findFirstAudioFile(Path albumPath) {
+        if (albumPath == null || !Files.isDirectory(albumPath)) {
+            return Optional.empty();
+        }
+        
+        try (Stream<Path> files = Files.list(albumPath)) {
+            return files
+                .filter(Files::isRegularFile)
+                .filter(this::isAudioFile)
+                .sorted()
+                .findFirst();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+    
+    /**
+     * Checks if the given path is an audio file based on its extension.
+     * @param filePath The path to check
+     * @return true if the file is an audio file, false otherwise
+     */
+    private boolean isAudioFile(Path filePath) {
+        if (filePath == null) {
+            return false;
+        }
+        String fileName = filePath.getFileName().toString().toLowerCase();
+        return fileName.endsWith(".mp3") || 
+               fileName.endsWith(".m4a") || 
+               fileName.endsWith(".aac") ||
+               fileName.endsWith(".flac") ||
+               fileName.endsWith(".wav") ||
+               fileName.endsWith(".ogg");
     }
 }
