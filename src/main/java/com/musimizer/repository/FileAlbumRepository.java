@@ -75,6 +75,33 @@ public class FileAlbumRepository implements AlbumRepository {
     }
 
     @Override
+    public SequencedSet<Path> loadBookmarks(Path bookmarksFile) {
+        try {
+            if (Files.exists(bookmarksFile)) {
+                return Files.readAllLines(bookmarksFile).stream()
+                        .map(Path::of)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+            }
+            return new LinkedHashSet<>();
+        } catch (IOException e) {
+            throw new MusicDirectoryException("Failed to load bookmarks", e);
+        }
+    }
+
+    @Override
+    public void saveBookmarks(Path bookmarksFile, Collection<Path> bookmarks) {
+        try {
+            Files.createDirectories(bookmarksFile.getParent());
+            var pathsAsStrings = bookmarks.stream()
+                    .map(Path::toString)
+                    .collect(Collectors.toList());
+            Files.write(bookmarksFile, pathsAsStrings);
+        } catch (IOException e) {
+            throw new MusicDirectoryException("Failed to save bookmarks", e);
+        }
+    }
+
+    @Override
     public List<Path> findAllAlbums(Path musicDir) {
         if (!Files.exists(musicDir) || !Files.isDirectory(musicDir)) {
             throw new MusicDirectoryException("Music directory does not exist or is not accessible: " + musicDir);
@@ -83,12 +110,12 @@ public class FileAlbumRepository implements AlbumRepository {
         if (allAlbums != null) 
             return allAlbums;
 
-        try (Stream<Path> artistDirs = Files.list(musicDir)) {
-            allAlbums = artistDirs
+        try (Stream<Path> artists = Files.list(musicDir)) {
+            allAlbums = artists
                     .filter(Files::isDirectory)
                     .flatMap(artistDir -> {
-                        try (Stream<Path> albumDirs = Files.list(artistDir)) {
-                            return albumDirs
+                        try (Stream<Path> albums = Files.list(artistDir)) {
+                            return albums
                                     .filter(Files::isDirectory)
                                     .map(Path::toAbsolutePath)
                                     .collect(Collectors.toList()).stream();

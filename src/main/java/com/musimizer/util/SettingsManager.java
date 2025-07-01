@@ -5,12 +5,17 @@ import com.musimizer.exception.MusicDirectoryException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class SettingsManager {
     private static final Logger LOGGER = Logger.getLogger(SettingsManager.class.getName());
@@ -23,6 +28,7 @@ public class SettingsManager {
     private static final int DEFAULT_NUM_SEARCH_RESULTS = 50;
 
     private static final String SETTINGS_FILE_NAME = "musimizer_settings.properties";
+    private static final String BOOKMARKS_FILE_NAME = "bookmarks.txt";
     private static final Path SETTINGS_FILE_PATH;
     private static final Properties properties = new Properties();
 
@@ -99,6 +105,65 @@ public class SettingsManager {
 
     public static Path getExclusionFilePath() {
         return getAppDataPath().resolve("excluded_albums.txt");
+    }
+    
+    public static Path getBookmarksFilePath() {
+        return getAppDataPath().resolve(BOOKMARKS_FILE_NAME);
+    }
+    
+    /**
+     * Toggles the bookmark status of an album path.
+     * @param albumPath the path to toggle bookmark for
+     * @return true if the album was bookmarked, false if it was unbookmarked
+     * @throws IOException if there's an error accessing the bookmarks file
+     */
+    public static boolean toggleBookmark(Path albumPath) throws IOException {
+        Path bookmarksFile = getBookmarksFilePath();
+        Files.createDirectories(bookmarksFile.getParent());
+        
+        // Read existing bookmarks
+        List<String> bookmarks = new ArrayList<>();
+        if (Files.exists(bookmarksFile)) {
+            bookmarks = new ArrayList<>(Files.readAllLines(bookmarksFile, StandardCharsets.UTF_8));
+        }
+        
+        String path = albumPath.toString();
+        boolean wasRemoved = bookmarks.remove(path);
+        
+        if (!wasRemoved) {
+            // If it wasn't in the list, add it
+            bookmarks.add(path);
+        }
+        
+        // Write the updated list back to the file
+        Files.write(bookmarksFile, bookmarks, StandardCharsets.UTF_8);
+        return !wasRemoved; // Return true if added, false if removed
+    }
+    
+    /**
+     * Checks if an album path is bookmarked.
+     * @param albumPath the path to check
+     * @return true if the path is bookmarked, false otherwise
+     * @throws IOException if there's an error reading the bookmarks file
+     */
+    public static boolean isBookmarked(Path albumPath) throws IOException {
+        Path bookmarksFile = getBookmarksFilePath();
+        if (!Files.exists(bookmarksFile)) {
+            return false;
+        }
+        String path = albumPath.toString();
+        return Files.lines(bookmarksFile).anyMatch(path::equals);
+    }
+    
+    public static List<Path> getBookmarks() throws IOException {
+        Path bookmarksFile = getBookmarksFilePath();
+        if (!Files.exists(bookmarksFile)) {
+            return Collections.emptyList();
+        }
+        
+        return Files.readAllLines(bookmarksFile, StandardCharsets.UTF_8).stream()
+                .map(Paths::get)
+                .collect(Collectors.toList());
     }
 
     public static void ensureExclusionFileExists() throws IOException {

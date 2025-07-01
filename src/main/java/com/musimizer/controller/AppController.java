@@ -2,13 +2,13 @@ package com.musimizer.controller;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-import com.musimizer.repository.AlbumRepository;
-import com.musimizer.repository.FileAlbumRepository;
 import com.musimizer.service.AlbumService;
 import com.musimizer.service.PlaybackService;
+import com.musimizer.repository.AlbumRepository;
 import com.musimizer.ui.dialogs.SettingsDialog;
 import com.musimizer.util.ExceptionHandler;
 import com.musimizer.util.SettingsManager;
@@ -29,6 +29,15 @@ public class AppController {
     private final Button backButton;
     private final Label titleLabel;
     private static final String DEFAULT_TITLE = "Randomly Selected Albums";
+    private static final String BOOKMARKS_TITLE = "Bookmarked Albums";
+    
+    private enum ViewMode {
+        RANDOM,
+        BOOKMARKS,
+        SEARCH_RESULTS
+    }
+    
+    private ViewMode currentView = ViewMode.RANDOM;
 
     public AppController(Stage primaryStage, ListView<Path> albumListView, Button pickButton, Button backButton,
             Label titleLabel) {
@@ -64,7 +73,7 @@ public class AppController {
 
     private void initializeWithSettings() {
         try {
-            var albumRepository = new FileAlbumRepository();
+            AlbumRepository albumRepository = new com.musimizer.repository.FileAlbumRepository();
             albumService = new AlbumService(albumRepository, Paths.get(SettingsManager.getMusicDir()),
                     SettingsManager.getExclusionFilePath());
             albumService.loadExcludedAlbums();
@@ -145,6 +154,7 @@ public class AppController {
             updateAlbumList(searchResults);
             pickButton.setVisible(false);
             backButton.setVisible(true);
+            currentView = ViewMode.SEARCH_RESULTS;
             titleLabel.setText((searchResults.isEmpty() ? "No " : "") + "Search Results for: " + keywords);
         } catch (Exception e) {
             ExceptionHandler.handle(e, "searching albums");
@@ -153,32 +163,76 @@ public class AppController {
 
     public void showRandomPicks() {
         Platform.runLater(() -> {
-            updateAlbumList(albumService.getCurrentPicks());
-            pickButton.setVisible(true);
-            backButton.setVisible(false);
-            titleLabel.setText(DEFAULT_TITLE);
+            try {
+                updateAlbumList(albumService.getCurrentPicks());
+                pickButton.setVisible(true);
+                backButton.setVisible(false);
+                currentView = ViewMode.RANDOM;
+                titleLabel.setText(DEFAULT_TITLE);
+            } catch (Exception e) {
+                ExceptionHandler.handle(e, "showing random picks");
+            }
         });
     }
-
+    
+    public void showBookmarks() {
+        Platform.runLater(() -> {
+            try {
+                var bookmarks = albumService.getBookmarkedAlbums();
+                updateAlbumList(bookmarks);
+                pickButton.setVisible(false);
+                backButton.setVisible(true);
+                currentView = ViewMode.BOOKMARKS;
+                titleLabel.setText(bookmarks.isEmpty() ? "No Bookmarks." : BOOKMARKS_TITLE);
+            } catch (Exception e) {
+                ExceptionHandler.handle(e, "loading bookmarks");
+            }
+        });
+    }
+    
+    public void toggleBookmark(Path albumPath) {
+        try {
+            albumService.toggleBookmark(albumPath);
+            if (currentView == ViewMode.BOOKMARKS) {
+                showBookmarks();
+            }
+        } catch (Exception e) {
+            ExceptionHandler.handle(e, "toggling bookmark");
+        }
+    }
+    
+    public boolean isShowingBookmarks() {
+        return currentView == ViewMode.BOOKMARKS;
+    }
+    
+    public boolean isShowingSearchResults() {
+        return currentView == ViewMode.SEARCH_RESULTS;
+    }
+    
+    public boolean isShowingRandomPicks() {
+        return currentView == ViewMode.RANDOM;
+    }
+    
+    public boolean isBookmarked(Path albumPath) {
+        return albumService.isBookmarked(albumPath);
+    }
     public void pickAlbums() {
         try {
             albumService.generateNewPicks(SettingsManager.getNumberOfPicks());
             updateAlbumList(albumService.getCurrentPicks());
-            pickButton.setVisible(true);
-            backButton.setVisible(false);
+            currentView = ViewMode.RANDOM;
             titleLabel.setText(DEFAULT_TITLE);
         } catch (Exception e) {
-            boolean openSettings = ExceptionHandler.showConfirmation(
-                    "Music Directory Error",
-                    "Error generating album picks",
-                    e.getMessage() + "\n\nWould you like to open settings to correct this?")
-                    .filter(buttonType -> buttonType == ButtonType.OK).isPresent();
-
-            if (openSettings)
+            Optional<ButtonType> result = ExceptionHandler.showConfirmation(
+                "Error Generating Picks",
+                "Failed to generate new album picks",
+                "Would you like to check your settings?");
+            if (result.isPresent() && result.get() == ButtonType.OK) {
                 showSettingsDialog();
+            }
         }
     }
-
+    
     public void playAlbum(Path albumPath) {
         try {
             playbackService.playAlbum(albumPath);
@@ -186,12 +240,12 @@ public class AppController {
             ExceptionHandler.handle(e, "playing album");
         }
     }
-
+    
     public String albumPathToDisplayString(Path albumPath) {
         return albumService.albumPathToDisplayString(albumPath);
     }
-
-    public void updateAlbumList(List<Path> albums) {
+    
+    public void updateAlbumList(Collection<Path> albums) {
         albumListView.getItems().setAll(albums);
     }
 }

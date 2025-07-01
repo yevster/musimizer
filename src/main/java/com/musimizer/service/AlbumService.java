@@ -16,7 +16,9 @@ public class AlbumService {
     private final Path musicDir;
     private final Path exclusionFile;
     private final Path savedPicksFile;
+    private final Path bookmarksFile;
     private Set<Path> excludedAlbums;
+    private SequencedSet<Path> bookmarkedAlbums;
     private List<Path> currentPicks;
 
     public AlbumService(AlbumRepository albumRepository, Path musicDir, Path exclusionFile) {
@@ -24,10 +26,13 @@ public class AlbumService {
         this.musicDir = musicDir;
         this.exclusionFile = exclusionFile;
         this.savedPicksFile = exclusionFile.getParent().resolve("saved_picks.txt");
+        this.bookmarksFile = exclusionFile.getParent().resolve("bookmarks.txt");
         this.excludedAlbums = new LinkedHashSet<>();
+        this.bookmarkedAlbums = new LinkedHashSet<>();
         this.currentPicks = new ArrayList<>();
         
         loadExcludedAlbums();
+        loadBookmarks();
     }
 
     public void loadExcludedAlbums() {
@@ -132,6 +137,33 @@ public class AlbumService {
 
     public Set<Path> getExcludedAlbums() {
         return Collections.unmodifiableSet(excludedAlbums);
+    }
+    
+    public SequencedSet<Path> getBookmarkedAlbums() {
+        return Collections.unmodifiableSequencedSet(bookmarkedAlbums);
+    }
+    
+    public void loadBookmarks() {
+        bookmarkedAlbums = albumRepository.loadBookmarks(bookmarksFile);
+    }
+    
+    public boolean toggleBookmark(Path albumPath) {
+        boolean wasBookmarked = bookmarkedAlbums.contains(albumPath);
+        if (wasBookmarked) {
+            bookmarkedAlbums.remove(albumPath);
+        } else {
+            bookmarkedAlbums.add(albumPath);
+        }
+        saveBookmarks();
+        return !wasBookmarked;
+    }
+    
+    public boolean isBookmarked(Path albumPath) {
+        return bookmarkedAlbums.contains(albumPath);
+    }
+    
+    private void saveBookmarks() {
+        albumRepository.saveBookmarks(bookmarksFile, bookmarkedAlbums);
     }
     
     /**

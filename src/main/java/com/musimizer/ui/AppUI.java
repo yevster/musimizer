@@ -3,6 +3,7 @@ package com.musimizer.ui;
 import com.musimizer.controller.AppController;
 import com.musimizer.service.AlbumService;
 import com.musimizer.util.AudioMetadataRetriever;
+import com.musimizer.util.ExceptionHandler;
 
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -106,8 +107,18 @@ public class AppUI {
         findItem.setOnAction(e -> showFindDialog(albumList,
                 (AppController) ((BorderPane) primaryStage.getScene().getRoot()).getUserData()));
         editMenu.getItems().add(findItem);
+        
+        // View menu
+        Menu viewMenu = new Menu("View");
+        MenuItem bookmarksItem = new MenuItem("Bookmarks");
+        bookmarksItem.setAccelerator(KeyCombination.keyCombination("shortcut+B"));
+        bookmarksItem.setOnAction(e -> {
+            AppController controller = (AppController) ((BorderPane) primaryStage.getScene().getRoot()).getUserData();
+            controller.showBookmarks();
+        });
+        viewMenu.getItems().add(bookmarksItem);
 
-        menuBar.getMenus().addAll(fileMenu, editMenu);
+        menuBar.getMenus().addAll(fileMenu, editMenu, viewMenu);
         return menuBar;
     }
 
@@ -124,23 +135,43 @@ public class AppUI {
         return button;
     }
 
-    private static void setupEscapeKeyHandler(Stage stage, AppController controller) {
-        Scene scene = stage.getScene();
+    private static void setupEscapeKeyHandler(Stage primaryStage, AppController controller) {
+        Scene scene = primaryStage.getScene();
         if (scene == null) {
-            stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            primaryStage.sceneProperty().addListener((obs, oldScene, newScene) -> {
                 if (newScene != null) {
                     addEscapeHandler(newScene, controller);
+                    addKeyboardShortcuts(newScene, controller);
                 }
             });
         } else {
             addEscapeHandler(scene, controller);
+            addKeyboardShortcuts(scene, controller);
         }
+    }
+    
+    private static void addKeyboardShortcuts(Scene scene, AppController controller) {
+        scene.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
+            // Handle ESC key to go back to random picks from bookmarks or search results
+            if (event.getCode() == KeyCode.ESCAPE && 
+                (controller.isShowingBookmarks() || controller.isShowingSearchResults())) {
+                controller.showRandomPicks();
+                event.consume();
+            }
+            // Handle CTRL+B to show bookmarks
+            else if (event.isControlDown() && event.getCode() == KeyCode.B) {
+                controller.showBookmarks();
+                event.consume();
+            }
+        });
     }
 
     private static void addEscapeHandler(Scene scene, AppController controller) {
         scene.addEventHandler(KeyEvent.KEY_RELEASED, event -> {
-            if (event.getCode() == KeyCode.ESCAPE) {
+            if (event.getCode() == KeyCode.ESCAPE && 
+                (controller.isShowingBookmarks() || controller.isShowingSearchResults())) {
                 controller.showRandomPicks();
+                event.consume();
             }
         });
     }
@@ -217,8 +248,9 @@ public class AppUI {
         private final Label albumLabel = new Label();
         private byte[] currentAlbumArtData;
         private final Button excludeButton = new Button();
-        private final Button folderButton = new Button();
         private final Button playButton = new Button();
+        private final Button folderButton = new Button();
+        private final Button bookmarkButton = new Button();
         private final HBox hbox = new HBox();
         private AppController controller;
 
@@ -238,7 +270,6 @@ public class AppUI {
         @Override
         protected void updateItem(Path item, boolean empty) {
             super.updateItem(item, empty);
-
             if (empty || item == null) {
                 setGraphic(null);
                 setText(null);
@@ -246,13 +277,9 @@ public class AppUI {
                 if (controller == null) {
                     controller = (AppController) getScene().getRoot().getUserData();
                 }
-
-                // Set album name
-                albumLabel.setText(controller.getAlbumService().albumPathToDisplayString(item));
-
-                // Load album art in background
+                albumLabel.setText(controller.albumPathToDisplayString(item));
                 loadAlbumArt(item);
-
+                updateBookmarkButton(item);
                 setGraphic(hbox);
                 setText(null); // Important: set text to null if using graphic
 
@@ -260,6 +287,7 @@ public class AppUI {
                 folderButton.setVisible(true);
                 excludeButton.setVisible(true);
                 playButton.setVisible(true);
+                bookmarkButton.setVisible(true);
             }
         }
 
@@ -350,7 +378,7 @@ public class AppUI {
             hbox.setPadding(new javafx.geometry.Insets(2,15,2,2));
 
             // Add all components to the HBox
-            hbox.getChildren().addAll(albumArtView, albumLabel, folderButton, excludeButton, playButton);
+            hbox.getChildren().addAll(albumArtView, albumLabel, folderButton, excludeButton, playButton, bookmarkButton);
 
             // Configure layout
             HBox.setHgrow(albumLabel, Priority.ALWAYS);
@@ -362,6 +390,7 @@ public class AppUI {
             setupFolderButton();
             setupExcludeButton(albumListView);
             setupPlayButton();
+            setupBookmarkButton(albumListView);
 
             setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
             setGraphic(hbox);
@@ -408,6 +437,53 @@ public class AppUI {
                         showError("Error", "Could not open folder",
                                 "Error opening album folder: " + ex.getMessage());
                     }
+                }
+            });
+        }
+
+        private void updateBookmarkButton(Path albumPath) {
+            if (controller == null) {
+                controller = (AppController) getScene().getRoot().getUserData();
+            }
+            boolean isBookmarked = controller.isBookmarked(albumPath);
+            
+            SVGPath bookmarkIcon = new SVGPath();
+            if (isBookmarked) {
+                // Filled bookmark icon
+                bookmarkIcon.setContent("M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z");
+                bookmarkIcon.setStyle("-fx-fill: #DC9F30;");
+            } else {
+                // Outline bookmark icon
+                bookmarkIcon.setContent("M17 18l-5-2.18L7 18V5h10v13zm0-15H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z");
+                bookmarkIcon.setStyle("-fx-fill: #757575;");
+            }
+            bookmarkIcon.setScaleX(0.7);
+            bookmarkIcon.setScaleY(0.7);
+            bookmarkButton.setGraphic(bookmarkIcon);
+            bookmarkButton.setTooltip(new Tooltip(isBookmarked ? "Remove bookmark" : "Add bookmark"));
+        }
+
+        private void setupBookmarkButton(ListView<Path> albumListView) {
+            bookmarkButton.setPrefSize(20, 20);
+            bookmarkButton.setStyle("-fx-background-color: transparent; -fx-padding: 2; -fx-cursor: hand; -fx-opacity: 0.7;");
+            
+            bookmarkButton.hoverProperty().addListener((obs, wasHovered, isNowHovered) -> {
+                bookmarkButton.setStyle(
+                    "-fx-background-color: " + (isNowHovered ? "#e8f5e9;" : "transparent;") +
+                    " -fx-padding: 0;" +
+                    " -fx-cursor: hand;" +
+                    " -fx-opacity: " + (isNowHovered ? "1.0;" : "0.7;"));
+            });
+            
+            bookmarkButton.setTooltip(new Tooltip("Bookmark this album"));
+            
+            bookmarkButton.setOnAction(e -> {
+                Path albumPath = getItem();
+                if (albumPath != null) {
+                    AppController controller = (AppController) getScene().getRoot().getUserData();
+                    controller.toggleBookmark(albumPath);
+                    // Update the button appearance after toggling
+                    updateBookmarkButton(albumPath);
                 }
             });
         }
