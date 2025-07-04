@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  JAVAFX_VERSION: "21.0.7"
+
 jobs:
   build:
     strategy:
@@ -35,16 +38,8 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
+        java-package: 'jdk+fx'
         cache: 'maven'
-
-    - name: Download JavaFX SDK (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        JAVAFX_VERSION=21.0.1
-        FXZIP="openjfx-${JAVAFX_VERSION}_mac-x64_bin-sdk.zip"
-        curl -L -o $FXZIP https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/$FXZIP
-        unzip -q $FXZIP
-        echo "JAVA_FX_SDK=$(pwd)/javafx-sdk-${JAVAFX_VERSION}" >> $GITHUB_ENV
 
     - name: Install WiX Toolset (Windows only, via Chocolatey)
       if: matrix.os == 'windows-latest'
@@ -55,7 +50,7 @@ jobs:
 
     - name: Create runtime image
       run: |
-        jlink --module-path "$JAVA_HOME/jmods:$(echo $JAVA_FX_SDK)/jmods" \
+        jlink --module-path "$JAVA_HOME/jmods" \
               --add-modules java.base,java.desktop,javafx.controls,javafx.fxml,javafx.graphics,javafx.base \
               --output target/image \
               --strip-debug \
@@ -86,3 +81,5 @@ jobs:
         name: Musimizer-${{ matrix.os }}-${{ github.ref_name }}
         path: target/installer/*.${{ matrix.file-ext }}
         if-no-files-found: error
+
+        
