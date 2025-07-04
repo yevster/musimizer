@@ -24,20 +24,30 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up JDK 21
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
         cache: 'maven'
     
-    - name: Set up WiX (Windows only)
+    - name: Install WiX Toolset (Windows only)
       if: matrix.os == 'windows-latest'
-      uses: wixtoolset/setup-wix@v1
-      with:
-        version: 'latest'  # or pin to a specific version like '3.11'
+      run: |
+        # Download WiX Toolset
+        $wixUrl = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311.exe"
+        $wixInstaller = "$env:RUNNER_TEMP\wix311.exe"
+        
+        # Download and install WiX
+        Invoke-WebRequest -Uri $wixUrl -OutFile $wixInstaller
+        Start-Process -FilePath $wixInstaller -ArgumentList "/quiet" -Wait -NoNewWindow
+        
+        # Add WiX to PATH
+        $wixPath = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
+        echo "$wixPath" >> $env:GITHUB_PATH
+        echo "WIX_PATH=$wixPath" >> $env:GITHUB_ENV
         
     - name: Build with Maven
       run: mvn -B clean package -DskipTests -Djavafx.platform=${{ matrix.os == 'windows-latest' && 'win' || 'mac' }}
@@ -58,6 +68,11 @@ jobs:
         $version = (Get-Content pom.xml | Select-String -Pattern '<version>([^<]+)' | ForEach-Object { $_.Matches.Groups[1].Value })
         $version = $version -replace '-SNAPSHOT$', ''
         
+        # On Windows, ensure WiX is in PATH
+        if ($env:RUNNER_OS -eq "Windows") {
+          $env:Path = "$env:WIX_PATH;$env:Path"
+        }
+        
         $jpackageArgs = @(
           "--name", "Musimizer",
           "--input", "target",
@@ -74,7 +89,7 @@ jobs:
         jpackage $jpackageArgs
         
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Musimizer-${{ matrix.os }}-${{ github.ref_name }}
         path: target/installer/*.${{ matrix.file-ext }}
