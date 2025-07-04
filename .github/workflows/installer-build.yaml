@@ -22,7 +22,7 @@ jobs:
             package-type: pkg
             file-ext: pkg
             jpackage-args: --mac-package-identifier com.musimizer --mac-package-name "Musimizer"
-            javafx-platform: mac
+            javafx-platform: osx
             javafx-ext: zip
 
     runs-on: ${{ matrix.os }}
