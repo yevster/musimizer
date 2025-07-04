@@ -37,11 +37,12 @@ jobs:
         distribution: 'temurin'
         cache: 'maven'
 
-    - name: Download JavaFX SDK
+    - name: Download JavaFX SDK (macOS)
+      if: matrix.os == 'macos-latest'
       run: |
         JAVAFX_VERSION=21.0.1
-        FXZIP="openjfx-${JAVAFX_VERSION}_${{ matrix.javafx-platform }}-x64_bin.${{ matrix.javafx-ext }}"
-        curl -L -o $FXZIP https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/${FXZIP}
+        FXZIP="openjfx-${JAVAFX_VERSION}_mac-x64_bin-sdk.zip"
+        curl -L -o $FXZIP https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/$FXZIP
         unzip -q $FXZIP
         echo "JAVA_FX_SDK=$(pwd)/javafx-sdk-${JAVAFX_VERSION}" >> $GITHUB_ENV
 
