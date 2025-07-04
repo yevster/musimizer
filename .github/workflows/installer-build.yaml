@@ -35,26 +35,43 @@ jobs:
     
     - name: Install WiX Toolset (Windows only)
       if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
         # Download WiX Toolset
         $wixUrl = "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311.exe"
         $wixInstaller = "$env:RUNNER_TEMP\wix311.exe"
         
         # Download and install WiX
+        Write-Host "Downloading WiX Toolset..."
         Invoke-WebRequest -Uri $wixUrl -OutFile $wixInstaller
+        Write-Host "Installing WiX Toolset..."
         Start-Process -FilePath $wixInstaller -ArgumentList "/quiet" -Wait -NoNewWindow
         
         # Add WiX to PATH
         $wixPath = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
-        echo "$wixPath" >> $env:GITHUB_PATH
-        echo "WIX_PATH=$wixPath" >> $env:GITHUB_ENV
+        Add-Content -Path $env:GITHUB_PATH -Value $wixPath
+        Write-Host "WIX_PATH=$wixPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+        Write-Host "WiX Toolset installed successfully"
         
     - name: Build with Maven
       run: mvn -B clean package -DskipTests -Djavafx.platform=${{ matrix.os == 'windows-latest' && 'win' || 'mac' }}
       
-    - name: Create runtime image
+    - name: Create runtime image (macOS)
+      if: matrix.os == 'macos-latest'
       run: |
-        $jmods = if ($env:RUNNER_OS -eq "Windows") { "$env:JAVA_HOME\jmods" } else { "$JAVA_HOME/jmods" }
+        jlink --module-path "$JAVA_HOME/jmods" \
+              --add-modules java.base,java.desktop,javafx.controls,javafx.fxml,javafx.graphics,javafx.base \
+              --output target/image \
+              --strip-debug \
+              --compress 2 \
+              --no-header-files \
+              --no-man-pages
+              
+    - name: Create runtime image (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $jmods = "$env:JAVA_HOME\jmods"
         jlink --module-path $jmods `
               --add-modules java.base,java.desktop,javafx.controls,javafx.fxml,javafx.graphics,javafx.base `
               --output target/image `
@@ -63,15 +80,31 @@ jobs:
               --no-header-files `
               --no-man-pages
               
-    - name: Create installer
+    - name: Create installer (macOS)
+      if: matrix.os == 'macos-latest'
       run: |
-        $version = (Get-Content pom.xml | Select-String -Pattern '<version>([^<]+)' | ForEach-Object { $_.Matches.Groups[1].Value })
-        $version = $version -replace '-SNAPSHOT$', ''
+        version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout | sed 's/-SNAPSHOT$//')
         
-        # On Windows, ensure WiX is in PATH
-        if ($env:RUNNER_OS -eq "Windows") {
-          $env:Path = "$env:WIX_PATH;$env:Path"
-        }
+        jpackage --name "Musimizer" \
+                 --input target \
+                 --main-jar "musimizer-${version}.jar" \
+                 --main-class "com.musimizer.MainApp" \
+                 --type "${{ matrix.package-type }}" \
+                 --dest target/installer \
+                 --runtime-image target/image \
+                 --app-version "$version" \
+                 --vendor "Musimizer" \
+                 --copyright "Copyright $(date +'%Y')" \
+                 ${{ matrix.jpackage-args }}
+                 
+    - name: Create installer (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $version = (mvn help:evaluate -Dexpression=project.version -q -DforceStdout) -replace '-SNAPSHOT$',''
+        
+        # Ensure WiX is in PATH
+        $env:Path = "$env:WIX_PATH;$env:Path"
         
         $jpackageArgs = @(
           "--name", "Musimizer",
