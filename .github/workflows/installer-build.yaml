@@ -39,7 +39,7 @@ jobs:
 
     - name: Download JavaFX SDK
       run: |
-        JAVAFX_VERSION=21.0.3
+        JAVAFX_VERSION=21.0.1
         FXZIP="openjfx-${JAVAFX_VERSION}_${{ matrix.javafx-platform }}-x64_bin.${{ matrix.javafx-ext }}"
         curl -L -o $FXZIP https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/${FXZIP}
         unzip -q $FXZIP
