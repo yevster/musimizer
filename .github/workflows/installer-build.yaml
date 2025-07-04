@@ -1,0 +1,81 @@
+name: Build and Package
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (e.g., v1.0.0)
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            package-type: msi
+            file-ext: msi
+            jpackage-args: --win-menu --win-shortcut --win-dir-chooser
+          - os: macos-latest
+            package-type: pkg
+            file-ext: pkg
+            jpackage-args: --mac-package-identifier com.musimizer --mac-package-name "Musimizer"
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+    
+    - name: Set up WiX (Windows only)
+      if: matrix.os == 'windows-latest'
+      uses: wixtoolset/setup-wix@v1
+      with:
+        version: 'latest'  # or pin to a specific version like '3.11'
+        
+    - name: Build with Maven
+      run: mvn -B clean package -DskipTests -Djavafx.platform=${{ matrix.os == 'windows-latest' && 'win' || 'mac' }}
+      
+    - name: Create runtime image
+      run: |
+        $jmods = if ($env:RUNNER_OS -eq "Windows") { "$env:JAVA_HOME\jmods" } else { "$JAVA_HOME/jmods" }
+        jlink --module-path $jmods `
+              --add-modules java.base,java.desktop,javafx.controls,javafx.fxml,javafx.graphics,javafx.base `
+              --output target/image `
+              --strip-debug `
+              --compress 2 `
+              --no-header-files `
+              --no-man-pages
+              
+    - name: Create installer
+      run: |
+        $version = (Get-Content pom.xml | Select-String -Pattern '<version>([^<]+)' | ForEach-Object { $_.Matches.Groups[1].Value })
+        $version = $version -replace '-SNAPSHOT$', ''
+        
+        $jpackageArgs = @(
+          "--name", "Musimizer",
+          "--input", "target",
+          "--main-jar", "musimizer-${version}.jar",
+          "--main-class", "com.musimizer.MainApp",
+          "--type", "${{ matrix.package-type }}",
+          "--dest", "target/installer",
+          "--runtime-image", "target/image",
+          "--app-version", "$version",
+          "--vendor", "Musimizer",
+          "--copyright", "Copyright $(Get-Date -Format 'yyyy')"
+        ) + ${{ matrix.jpackage-args }}.Split(" ")
+        
+        jpackage $jpackageArgs
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Musimizer-${{ matrix.os }}-${{ github.ref_name }}
+        path: target/installer/*.${{ matrix.file-ext }}
+        if-no-files-found: error
