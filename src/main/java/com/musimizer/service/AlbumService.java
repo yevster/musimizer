@@ -100,21 +100,38 @@ public class AlbumService {
         }
         List<Path> allAlbums = findAllAlbums();
         var albumStream = allAlbums.stream();
-        if (settings.isApplyExclusionsToSearch()) {
+        if (settings.isApplyExclusionsToSearch()) 
             albumStream = albumStream.filter(Predicate.not(excludedAlbums::contains));
-        }
-        
+            
+    
         List<Path> searchResults = albumStream
                 .filter(album -> {
-                    String searchableAlbum = albumPathToDisplayString(album).toLowerCase();
+                    String searchableAlbum = removeDiacriticalMarks(albumPathToDisplayString(album).toLowerCase());
                     return searchTerms.stream()
                             .map(String::toLowerCase)
+                            .map(this::removeDiacriticalMarks)
                             .allMatch(searchableAlbum::contains);
                 })
                 .collect(Collectors.toList());
 
         Collections.shuffle(searchResults);
         return searchResults.subList(0, Math.min(maxResults, searchResults.size()));
+    }
+
+    /**
+     * Removes diacritical marks (accents) from a string.
+     * For example, converts "Café" to "Cafe" and "Héllò" to "Hello".
+     *
+     * @param str The input string that may contain diacritical marks
+     * @return The input string with diacritical marks removed
+     */
+    private String removeDiacriticalMarks(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        
+        String normalized = java.text.Normalizer.normalize(str, java.text.Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
     }
 
     private List<Path> findAllAlbums() {

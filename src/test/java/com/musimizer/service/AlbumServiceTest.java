@@ -258,6 +258,49 @@ class AlbumServiceTest {
     }
 
     @Test
+    void searchAlbums_shouldHandleDiacritics() throws Exception {
+        // Given - Set up test data with various diacritical marks
+        List<Path> albumsWithDiacritics = List.of(
+            Path.of(musicDir.toAbsolutePath().toString(), "Antonín Dvořák", "Symphony No. 9"),
+            Path.of(musicDir.toAbsolutePath().toString(), "Béla Bartók", "Concerto for Orchestra"),
+            Path.of(musicDir.toAbsolutePath().toString(), "Franz Liszt", "Les Préludes"),
+            Path.of(musicDir.toAbsolutePath().toString(), "Gustav Mahler", "Symphony No. 5")
+        );
+        when(albumRepository.findAllAlbums(musicDir)).thenReturn(albumsWithDiacritics);
+        when(settings.isApplyExclusionsToSearch()).thenReturn(false);
+
+        // Test 1: Search with no diacritics should match names with diacritics
+        List<Path> results1 = albumService.searchAlbums(List.of("Dvorak"), 10);
+        assertEquals(1, results1.size(), "Should find Dvořák when searching for Dvorak");
+        assertTrue(results1.get(0).toString().contains("Antonín Dvořák"));
+
+        // Test 2: Search with different diacritics should still match
+        List<Path> results2 = albumService.searchAlbums(List.of("Dvořak"), 10);
+        assertEquals(1, results2.size(), "Should find Dvořák when searching with different diacritics");
+        assertTrue(results2.get(0).toString().contains("Antonín Dvořák"));
+
+        // Test 3: Search with partial match and diacritics
+        List<Path> results3 = albumService.searchAlbums(List.of("Bela", "Bartok"), 10);
+        assertEquals(1, results3.size(), "Should find Béla Bartók when searching for Bela Bartok");
+        assertTrue(results3.get(0).toString().contains("Béla Bartók"));
+
+        // Test 4: Search with multiple terms should require ALL terms to match
+        // First test with both terms that match a single album
+        List<Path> results4a = albumService.searchAlbums(List.of("Symphony", "No"), 10);
+        assertEquals(2, results4a.size(), "Should find albums with both 'Symphony' and 'No' in their paths");
+        assertTrue(results4a.stream().anyMatch(p -> p.toString().contains("Symphony No. 9")));
+        assertTrue(results4a.stream().anyMatch(p -> p.toString().contains("Symphony No. 5")));
+        
+        // Test with terms that don't appear together in any album
+        List<Path> results4b = albumService.searchAlbums(List.of("Symphony", "Orchestra"), 10);
+        assertTrue(results4b.isEmpty(), "Should find no albums that contain both 'Symphony' and 'Orchestra' in their paths");
+
+        // Test 5: Search with no matches
+        List<Path> results5 = albumService.searchAlbums(List.of("Chopin"), 10);
+        assertTrue(results5.isEmpty(), "Should not find any matches for Chopin");
+    }
+
+    @Test
     void loadExcludedAlbums_shouldReloadExcludedAlbums() throws Exception {
         // Given
         Set<Path> excluded = Set.of(sampleAlbums.get(0));
