@@ -283,9 +283,9 @@ public class AppUI {
                 setGraphic(hbox);
                 setText(null); // Important: set text to null if using graphic
 
-                // Make sure buttons are visible when an item is present
+                // Make sure the correct buttons are visible when an item is present
                 folderButton.setVisible(true);
-                excludeButton.setVisible(true);
+                excludeButton.setVisible(!controller.isExcluded(item));
                 playButton.setVisible(true);
                 bookmarkButton.setVisible(true);
             }
@@ -518,8 +518,9 @@ public class AppUI {
                     return;
                 AppController controller = (AppController) getScene().getRoot().getUserData();
                 controller.excludeAlbum(albumPath);
-                // Remove only this album from the list viewAdd commentMore actions
-                albumListView.getItems().remove(albumPath);
+                if (!controller.isShowingBookmarks())
+                    albumListView.getItems().remove(albumPath);
+
             });
         }
 

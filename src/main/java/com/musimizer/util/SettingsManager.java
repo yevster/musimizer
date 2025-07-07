@@ -23,9 +23,11 @@ public class SettingsManager {
     static final String MUSIC_DIR_KEY = "musicDir";
     static final String NUM_PICKS_KEY = "numberOfPicks";
     static final String NUM_SEARCH_RESULTS_KEY = "numberOfSearchResults";
+    static final String APPLY_EXCLUSIONS_TO_SEARCH_KEY = "applyExclusionsToSearch";
 
     private static final int DEFAULT_NUM_PICKS = 25;
     private static final int DEFAULT_NUM_SEARCH_RESULTS = 50;
+    private static final boolean DEFAULT_APPLY_EXCLUSIONS_TO_SEARCH = true;
 
     private static final String SETTINGS_FILE_NAME = "musimizer_settings.properties";
     private static final String BOOKMARKS_FILE_NAME = "bookmarks.txt";
@@ -61,6 +63,7 @@ public class SettingsManager {
         properties.putIfAbsent(MUSIC_DIR_KEY, "");
         properties.putIfAbsent(NUM_PICKS_KEY, String.valueOf(DEFAULT_NUM_PICKS));
         properties.putIfAbsent(NUM_SEARCH_RESULTS_KEY, String.valueOf(DEFAULT_NUM_SEARCH_RESULTS));
+        properties.putIfAbsent(APPLY_EXCLUSIONS_TO_SEARCH_KEY, String.valueOf(DEFAULT_APPLY_EXCLUSIONS_TO_SEARCH));
     }
 
     private static void saveSettings() {
@@ -100,6 +103,16 @@ public class SettingsManager {
     public static void setNumberOfSearchResults(int number) {
         int validNumber = Math.max(1, number); // Ensure at least 1
         properties.setProperty(NUM_SEARCH_RESULTS_KEY, String.valueOf(validNumber));
+        saveSettings();
+    }
+    
+    public static boolean isApplyExclusionsToSearch() {
+        return Boolean.parseBoolean(properties.getProperty(APPLY_EXCLUSIONS_TO_SEARCH_KEY, 
+                String.valueOf(DEFAULT_APPLY_EXCLUSIONS_TO_SEARCH)));
+    }
+    
+    public static void setApplyExclusionsToSearch(boolean apply) {
+        properties.setProperty(APPLY_EXCLUSIONS_TO_SEARCH_KEY, String.valueOf(apply));
         saveSettings();
     }
 

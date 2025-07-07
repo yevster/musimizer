@@ -2,12 +2,15 @@ package com.musimizer.service;
 
 import com.musimizer.exception.MusicDirectoryException;
 import com.musimizer.repository.AlbumRepository;
+import com.musimizer.settings.ApplicationSettings;
+import com.musimizer.settings.DefaultApplicationSettings;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -17,14 +20,28 @@ public class AlbumService {
     private final Path exclusionFile;
     private final Path savedPicksFile;
     private final Path bookmarksFile;
+    private final ApplicationSettings settings;
     private Set<Path> excludedAlbums;
     private SequencedSet<Path> bookmarkedAlbums;
     private List<Path> currentPicks;
 
     public AlbumService(AlbumRepository albumRepository, Path musicDir, Path exclusionFile) {
+        this(albumRepository, musicDir, exclusionFile, new DefaultApplicationSettings());
+    }
+    
+    /**
+     * Creates a new AlbumService with the specified dependencies.
+     * 
+     * @param albumRepository the album repository to use
+     * @param musicDir the music directory path
+     * @param exclusionFile the exclusion file path
+     * @param settings the application settings to use
+     */
+    public AlbumService(AlbumRepository albumRepository, Path musicDir, Path exclusionFile, ApplicationSettings settings) {
         this.albumRepository = albumRepository;
         this.musicDir = musicDir;
         this.exclusionFile = exclusionFile;
+        this.settings = settings;
         this.savedPicksFile = exclusionFile.getParent().resolve("saved_picks.txt");
         this.bookmarksFile = exclusionFile.getParent().resolve("bookmarks.txt");
         this.excludedAlbums = new LinkedHashSet<>();
@@ -70,7 +87,8 @@ public class AlbumService {
     }
 
     public void excludeAlbum(Path albumPath) {
-        excludedAlbums.add(albumPath);
+        if (!excludedAlbums.add(albumPath))
+            return;
         currentPicks.remove(albumPath);
         saveExcludedAlbums();
         saveCurrentPicks();
@@ -80,10 +98,13 @@ public class AlbumService {
         if (searchTerms == null || searchTerms.isEmpty() || maxResults <= 0) {
             return Collections.emptyList();
         }
-
         List<Path> allAlbums = findAllAlbums();
-        List<Path> searchResults = allAlbums.stream()
-                .filter(album -> !excludedAlbums.contains(album))
+        var albumStream = allAlbums.stream();
+        if (settings.isApplyExclusionsToSearch()) {
+            albumStream = albumStream.filter(Predicate.not(excludedAlbums::contains));
+        }
+        
+        List<Path> searchResults = albumStream
                 .filter(album -> {
                     String searchableAlbum = albumPathToDisplayString(album).toLowerCase();
                     return searchTerms.stream()

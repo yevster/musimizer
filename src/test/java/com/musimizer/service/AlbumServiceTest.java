@@ -2,6 +2,7 @@ package com.musimizer.service;
 
 import com.musimizer.exception.MusicDirectoryException;
 import com.musimizer.repository.AlbumRepository;
+import com.musimizer.settings.ApplicationSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +26,7 @@ class AlbumServiceTest {
     private AlbumRepository albumRepository;
     
     private AlbumService albumService;
+    private ApplicationSettings settings;
     private Path musicDir;
     private Path exclusionFile;
     private Path savedPicksFile;
@@ -36,7 +38,8 @@ class AlbumServiceTest {
         musicDir = tempDir.resolve("music");
         exclusionFile = tempDir.resolve("excluded_albums.txt");
         savedPicksFile = tempDir.resolve("saved_picks.txt");
-        albumService = new AlbumService(albumRepository, musicDir, exclusionFile);
+        settings = mock(ApplicationSettings.class);
+        albumService = new AlbumService(albumRepository, musicDir, exclusionFile, settings);
         sampleAlbums = List.of(
             Path.of(musicDir.toAbsolutePath().toString(), "Artist1", "Album1"),
             Path.of(musicDir.toAbsolutePath().toString(), "Artist1", "Album2"),
@@ -156,8 +159,9 @@ class AlbumServiceTest {
     void searchAlbums_shouldReturnMatchingAlbums() throws Exception {
         // Given
         when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
+        when(settings.isApplyExclusionsToSearch()).thenReturn(true);
         
-        // When
+        // When - Test with exclusions applied (default behavior)
         List<Path> results = albumService.searchAlbums(List.of("Artist1"), 10);
         
         // Then
@@ -165,7 +169,7 @@ class AlbumServiceTest {
         assertTrue(results.contains(sampleAlbums.get(0)));
         assertTrue(results.contains(sampleAlbums.get(1)));
 
-        //Some special cases in album and search names
+        // Some special cases in album and search names
         assertEquals(1, albumService.searchAlbums(List.of("tist2", "bum2"), 10).size());
         assertEquals(1, albumService.searchAlbums(List.of("Ar-tist2"), 10).size());
     }
@@ -174,6 +178,7 @@ class AlbumServiceTest {
     void searchAlbums_shouldRespectMaxResults() throws Exception {
         // Given
         when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
+        when(settings.isApplyExclusionsToSearch()).thenReturn(true);
         
         // When
         List<Path> results = albumService.searchAlbums(List.of("Album"), 2);
@@ -183,14 +188,62 @@ class AlbumServiceTest {
     }
 
     @Test
-    void searchAlbums_shouldReturnEmptyListForEmptySearchTerms() throws Exception {
-        // When
-        List<Path> results = albumService.searchAlbums(Collections.emptyList(), 10);
-        
-        // Then
-        assertTrue(results.isEmpty());
+    void searchAlbums_shouldReturnEmptyListForEmptySearchTerms() {
+        // When/Then - Should return empty list for empty search terms
+        assertTrue(albumService.searchAlbums(Collections.emptyList(), 10).isEmpty());
     }
 
+    @Test
+    void searchAlbums_shouldExcludeAlbumsWhenSettingIsEnabled() throws Exception {
+        // Given
+        when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
+        when(settings.isApplyExclusionsToSearch()).thenReturn(true);
+        
+        Path excludedAlbum = sampleAlbums.get(0);
+        albumService.excludeAlbum(excludedAlbum);
+        
+        // When - With exclusions enabled (default)
+        List<Path> results = albumService.searchAlbums(List.of("Artist1"), 10);
+        
+        // Then - Should not contain excluded album
+        assertEquals(1, results.size());
+        assertFalse(results.contains(excludedAlbum));
+        assertTrue(results.contains(sampleAlbums.get(1))); // The other album from Artist1
+    }
+    
+    @Test
+    void searchAlbums_shouldIncludeExcludedAlbumsWhenSettingIsDisabled() throws Exception {
+        // Given
+        when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
+        when(settings.isApplyExclusionsToSearch()).thenReturn(false);
+        
+        Path excludedAlbum = sampleAlbums.get(0);
+        albumService.excludeAlbum(excludedAlbum);
+        
+        // When - With exclusions disabled
+        List<Path> results = albumService.searchAlbums(List.of("Artist1"), 10);
+        
+        // Then - Should include excluded album in results
+        assertEquals(2, results.size());
+        assertTrue(results.contains(excludedAlbum));
+        assertTrue(results.contains(sampleAlbums.get(1)));
+    }
+    
+    @Test
+    void searchAlbums_shouldHandleMixedCaseSearchTerms() throws Exception {
+        // Given
+        when(albumRepository.findAllAlbums(musicDir)).thenReturn(new ArrayList<>(sampleAlbums));
+        when(settings.isApplyExclusionsToSearch()).thenReturn(true);
+        
+        // When - Search with mixed case
+        List<Path> results = albumService.searchAlbums(List.of("aRtIsT1"), 10);
+        
+        // Then - Should match case-insensitively
+        assertEquals(2, results.size());
+        assertTrue(results.contains(sampleAlbums.get(0)));
+        assertTrue(results.contains(sampleAlbums.get(1)));
+    }
+    
     @Test
     void loadSavedPicks_shouldLoadPicksFromRepository() throws Exception {
         // Given

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.musimizer.service.AlbumService;
+import com.musimizer.settings.DefaultApplicationSettings;
 import com.musimizer.service.PlaybackService;
 import com.musimizer.repository.AlbumRepository;
 import com.musimizer.ui.dialogs.SettingsDialog;
@@ -74,8 +75,12 @@ public class AppController {
     private void initializeWithSettings() {
         try {
             AlbumRepository albumRepository = new com.musimizer.repository.FileAlbumRepository();
-            albumService = new AlbumService(albumRepository, Paths.get(SettingsManager.getMusicDir()),
-                    SettingsManager.getExclusionFilePath());
+            albumService = new AlbumService(
+                albumRepository, 
+                Paths.get(SettingsManager.getMusicDir()),
+                SettingsManager.getExclusionFilePath(),
+                new DefaultApplicationSettings()
+            );
             albumService.loadExcludedAlbums();
             albumService.loadSavedPicks();
 
@@ -120,6 +125,11 @@ public class AppController {
                 if (settings.numberOfSearchResults != SettingsManager.getNumberOfSearchResults()) {
                     SettingsManager.setNumberOfSearchResults(settings.numberOfSearchResults);
                 }
+                
+                // Update apply exclusions to search setting if changed
+                if (settings.applyExclusionsToSearch != SettingsManager.isApplyExclusionsToSearch()) {
+                    SettingsManager.setApplyExclusionsToSearch(settings.applyExclusionsToSearch);
+                }
 
                 // Reinitialize if music directory was changed
                 if (needsReinitialization) {
@@ -142,6 +152,10 @@ public class AppController {
         } catch (Exception e) {
             ExceptionHandler.handle(e, "excluding album");
         }
+    }
+
+    public boolean isExcluded(Path albumPath) {
+        return albumService.getExcludedAlbums().contains(albumPath);
     }
 
     public void showSearchResults(List<String> searchTerms, String keywords) {

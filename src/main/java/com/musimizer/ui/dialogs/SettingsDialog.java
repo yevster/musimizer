@@ -15,11 +15,17 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         public final String musicDir;
         public final int numberOfPicks;
         public final int numberOfSearchResults;
+        public final boolean applyExclusionsToSearch;
 
         public Settings(String musicDir, int numberOfPicks, int numberOfSearchResults) {
+            this(musicDir, numberOfPicks, numberOfSearchResults, true);
+        }
+        
+        public Settings(String musicDir, int numberOfPicks, int numberOfSearchResults, boolean applyExclusionsToSearch) {
             this.musicDir = musicDir;
             this.numberOfPicks = numberOfPicks;
             this.numberOfSearchResults = numberOfSearchResults;
+            this.applyExclusionsToSearch = applyExclusionsToSearch;
         }
     }
 
@@ -31,6 +37,7 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         String currentDir = SettingsManager.getMusicDir();
         int currentPicks = SettingsManager.getNumberOfPicks();
         int currentSearchResults = SettingsManager.getNumberOfSearchResults();
+        boolean applyExclusionsToSearch = SettingsManager.isApplyExclusionsToSearch();
         
         GridPane grid = new GridPane();
         grid.setHgap(10);
@@ -51,6 +58,10 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         Label searchResultsLabel = new Label("Number of Search Results:");
         Spinner<Integer> searchResultsSpinner = createNumberSpinner(1, 100, currentSearchResults);
         
+        // Apply exclusions to search results checkbox
+        CheckBox applyExclusionsCheckbox = new CheckBox("Apply exclusions to search results");
+        applyExclusionsCheckbox.setSelected(applyExclusionsToSearch);
+        
         // Add components to grid
         grid.add(dirLabel, 0, 0);
         grid.add(dirField, 1, 0);
@@ -59,6 +70,7 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
         grid.add(picksSpinner, 1, 1);
         grid.add(searchResultsLabel, 0, 2);
         grid.add(searchResultsSpinner, 1, 2);
+        grid.add(applyExclusionsCheckbox, 0, 3, 2, 1);
         
         // Set up browse button action
         browse.setOnAction(e -> {
@@ -116,7 +128,8 @@ public class SettingsDialog extends Dialog<SettingsDialog.Settings> {
                 return new Settings(
                     dirPath,
                     picksSpinner.getValue(),
-                    searchResultsSpinner.getValue()
+                    searchResultsSpinner.getValue(),
+                    applyExclusionsCheckbox.isSelected()
                 );
             }
             return null;
