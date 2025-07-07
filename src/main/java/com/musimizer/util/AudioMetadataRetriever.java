@@ -1,22 +1,15 @@
 package com.musimizer.util;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 
 /**
  * Utility class for retrieving metadata from audio files.
@@ -301,30 +294,57 @@ public class AudioMetadataRetriever {
     
     private static byte[] findCoverArtInIlst(RandomAccessFile file, long ilstSize) throws IOException {
         long ilstEnd = file.getFilePointer() + ilstSize;
-        ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.allocate(16).order(ByteOrder.BIG_ENDIAN);
+        
+        LOGGER.fine("Searching for cover art in ilst box, size: " + ilstSize);
         
         while (file.getFilePointer() < ilstEnd - 8) {
+            long boxStart = file.getFilePointer();
             buffer.clear();
-            if (file.read(buffer.array(), 0, 8) != 8) break;
+            if (file.read(buffer.array(), 0, 8) != 8) {
+                LOGGER.fine("Failed to read box header at position: " + boxStart);
+                break;
+            }
             
             long boxSize = buffer.getInt(0) & 0xFFFFFFFFL;
             String boxType = new String(buffer.array(), 4, 4, StandardCharsets.ISO_8859_1);
             
+            LOGGER.fine(String.format("Found box: %s, size: %d at position: %d", boxType, boxSize, boxStart));
+            
             if (boxType.equals("covr")) {
-                // Skip version and flags (4 bytes) and the 'data' box header (8 bytes)
-                file.skipBytes(12);
+                LOGGER.fine("Found 'covr' box, processing...");
                 
-                // Read the image data (remaining size - 12 bytes for the headers we skipped)
-                int imageSize = (int) (boxSize - 20); // 8 (header) + 12 (skipped) = 20
-                byte[] imageData = new byte[imageSize];
-                file.readFully(imageData);
-                return imageData;
+                // Read the full box content
+                byte[] boxData = new byte[(int)(boxSize - 8)]; // -8 for the header we already read
+                if (file.read(boxData) != boxData.length) {
+                    LOGGER.warning("Failed to read full covr box data");
+                    return null;
+                }
+                
+                // The covr box contains a data atom
+                // First 4 bytes: size, next 4 bytes: 'data' tag, next 4 bytes: flags
+                if (boxData.length < 12) {
+                    LOGGER.warning("covr box too small to contain valid data");
+                    return null;
+                }
+                
+                // Check for 'data' tag (bytes 4-8)
+                if (!(boxData[4] == 'd' && boxData[5] == 'a' && boxData[6] == 't' && boxData[7] == 'a')) {
+                    LOGGER.warning("covr box doesn't contain 'data' atom");
+                    // Try to find image data anyway by looking for image headers
+                    return findImageInData(boxData, 0);
+                }
+                
+                // Skip the data atom header (8 bytes size + 4 bytes 'data' + 4 bytes flags + 8 bytes reserved = 24 bytes)
+                // But some files might have different offsets, so we'll look for image headers
+                return findImageInData(boxData, 16); // Start after 'data' + flags (12 bytes) + 4 bytes reserved
             }
             
             // Skip to next box
             if (boxSize > 0) {
-                file.seek(file.getFilePointer() + boxSize - 8);
+                file.seek(boxStart + boxSize);
             } else {
+                LOGGER.warning("Invalid box size: " + boxSize);
                 break;
             }
         }
@@ -353,5 +373,54 @@ public class AudioMetadataRetriever {
             }
         }
         return true;
+    }
+    
+    /**
+     * Tries to find image data in a byte array by looking for image headers.
+     * @param data The data to search in
+     * @param startOffset The offset to start searching from
+     * @return The image data if found, or null if no valid image header is found
+     */
+    private static byte[] findImageInData(byte[] data, int startOffset) {
+        if (data == null || startOffset >= data.length) {
+            return null;
+        }
+        
+        // Look for JPEG start marker (0xFF 0xD8)
+        for (int i = startOffset; i < data.length - 1; i++) {
+            // Check for JPEG start marker
+            if (data[i] == (byte) 0xFF && data[i + 1] == (byte) 0xD8) {
+                LOGGER.fine("Found JPEG start marker at offset: " + i);
+                // Look for JPEG end marker (0xFF 0xD9)
+                for (int j = i + 2; j < data.length - 1; j++) {
+                    if (data[j] == (byte) 0xFF && data[j + 1] == (byte) 0xD9) {
+                        // Found complete JPEG
+                        byte[] imageData = new byte[j - i + 2];
+                        System.arraycopy(data, i, imageData, 0, imageData.length);
+                        return imageData;
+                    }
+                }
+                // If we get here, we found a start but no end - return what we have
+                byte[] imageData = new byte[data.length - i];
+                System.arraycopy(data, i, imageData, 0, imageData.length);
+                return imageData;
+            }
+            // Check for PNG header
+            else if (i < data.length - 7 && 
+                    data[i] == (byte) 0x89 && data[i + 1] == 0x50 && 
+                    data[i + 2] == 0x4E && data[i + 3] == 0x47 &&
+                    data[i + 4] == 0x0D && data[i + 5] == 0x0A &&
+                    data[i + 6] == 0x1A && data[i + 7] == 0x0A) {
+                LOGGER.fine("Found PNG header at offset: " + i);
+                // For PNG, we'll return everything from the header to the end
+                // since PNG has a well-defined end marker (IEND chunk)
+                byte[] imageData = new byte[data.length - i];
+                System.arraycopy(data, i, imageData, 0, imageData.length);
+                return imageData;
+            }
+        }
+        
+        LOGGER.warning("Could not find any image data in the provided data");
+        return null;
     }
 }
