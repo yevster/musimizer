@@ -520,7 +520,7 @@ public class AppUI {
                 controller.excludeAlbum(albumPath);
                 if (!controller.isShowingBookmarks())
                     albumListView.getItems().remove(albumPath);
-
+                updateItem(albumPath, false);
             });
         }
 
