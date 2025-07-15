@@ -17,33 +17,42 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+/**
+ * Unified settings manager for Musimizer application.
+ * Handles application settings, bookmarks, and exclusions with proper OS-specific paths.
+ */
 public class SettingsManager {
     private static final Logger LOGGER = Logger.getLogger(SettingsManager.class.getName());
 
-    static final String MUSIC_DIR_KEY = "musicDir";
-    static final String NUM_PICKS_KEY = "numberOfPicks";
-    static final String NUM_SEARCH_RESULTS_KEY = "numberOfSearchResults";
-    static final String APPLY_EXCLUSIONS_TO_SEARCH_KEY = "applyExclusionsToSearch";
+    // Property keys
+    public static final String MUSIC_DIR_KEY = "musicDir";
+    public static final String NUM_PICKS_KEY = "numberOfPicks";
+    public static final String NUM_SEARCH_RESULTS_KEY = "numberOfSearchResults";
+    public static final String APPLY_EXCLUSIONS_TO_SEARCH_KEY = "applyExclusionsToSearch";
 
+    // Default values
     private static final int DEFAULT_NUM_PICKS = 25;
-    private static final int DEFAULT_NUM_SEARCH_RESULTS = 50;
+    private static final int DEFAULT_NUM_SEARCH_RESULTS = 25;
     private static final boolean DEFAULT_APPLY_EXCLUSIONS_TO_SEARCH = true;
 
-    private static final String SETTINGS_FILE_NAME = "musimizer_settings.properties";
+    // File names
+    private static final String APP_NAME = "musimizer";
+    private static final String SETTINGS_FILE_NAME = "settings.properties";
     private static final String BOOKMARKS_FILE_NAME = "bookmarks.txt";
+    private static final String EXCLUSION_FILE_NAME = "excluded_albums.txt";
+    
+    // Paths
     private static final Path SETTINGS_FILE_PATH;
     private static final Properties properties = new Properties();
+    
+    // Legacy property keys for backward compatibility
+    private static final String LEGACY_MUSIC_DIR_KEY = "music_dir";
+    private static final String LEGACY_NUM_PICKS_KEY = "number_of_picks";
+    private static final String LEGACY_NUM_SEARCH_RESULTS_KEY = "number_of_search_results";
 
     static {
-        // Determine the settings file path based on OS
-        String appDataDir;
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            appDataDir = System.getenv("APPDATA");
-        } else {
-            // For Linux/macOS, use user.home/.config or similar
-            appDataDir = System.getProperty("user.home") + "/.config";
-        }
-        SETTINGS_FILE_PATH = Paths.get(appDataDir, "Musimizer", SETTINGS_FILE_NAME);
+        // Initialize settings file path and load settings
+        SETTINGS_FILE_PATH = getAppDataPath().resolve(SETTINGS_FILE_NAME);
         loadSettings();
     }
 
@@ -55,11 +64,43 @@ public class SettingsManager {
         if (Files.exists(SETTINGS_FILE_PATH)) {
             try (InputStream input = Files.newInputStream(SETTINGS_FILE_PATH)) {
                 properties.load(input);
+                migrateLegacySettings();
             } catch (IOException e) {
                 LOGGER.log(Level.SEVERE, "Failed to load settings from " + SETTINGS_FILE_PATH, e);
             }
         }
-        // Set default values if not present
+        // Ensure all required settings exist with default values
+        ensureDefaultSettings();
+    }
+    
+    /**
+     * Migrate settings from legacy property keys to new ones if needed.
+     */
+    private static void migrateLegacySettings() {
+        // Migrate from legacy property keys if they exist and new ones don't
+        migrateIfNeeded(LEGACY_MUSIC_DIR_KEY, MUSIC_DIR_KEY);
+        migrateIfNeeded(LEGACY_NUM_PICKS_KEY, NUM_PICKS_KEY);
+        migrateIfNeeded(LEGACY_NUM_SEARCH_RESULTS_KEY, NUM_SEARCH_RESULTS_KEY);
+        
+        // If we migrated any settings, save them back
+        if (properties.containsKey(LEGACY_MUSIC_DIR_KEY) || 
+            properties.containsKey(LEGACY_NUM_PICKS_KEY) || 
+            properties.containsKey(LEGACY_NUM_SEARCH_RESULTS_KEY)) {
+            saveSettings();
+        }
+    }
+    
+    private static void migrateIfNeeded(String oldKey, String newKey) {
+        if (properties.containsKey(oldKey) && !properties.containsKey(newKey)) {
+            properties.setProperty(newKey, properties.getProperty(oldKey));
+            properties.remove(oldKey);
+        }
+    }
+    
+    /**
+     * Ensure all required settings exist with default values.
+     */
+    private static void ensureDefaultSettings() {
         properties.putIfAbsent(MUSIC_DIR_KEY, "");
         properties.putIfAbsent(NUM_PICKS_KEY, String.valueOf(DEFAULT_NUM_PICKS));
         properties.putIfAbsent(NUM_SEARCH_RESULTS_KEY, String.valueOf(DEFAULT_NUM_SEARCH_RESULTS));
@@ -70,7 +111,7 @@ public class SettingsManager {
         try {
             Files.createDirectories(SETTINGS_FILE_PATH.getParent());
             try (OutputStream output = Files.newOutputStream(SETTINGS_FILE_PATH)) {
-                properties.store(output, null);
+                properties.store(output, "Musimizer Settings");
             }
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to save settings to " + SETTINGS_FILE_PATH, e);
@@ -116,8 +157,13 @@ public class SettingsManager {
         saveSettings();
     }
 
+    /**
+     * Gets the path to the exclusion file.
+     * 
+     * @return Path to the exclusion file
+     */
     public static Path getExclusionFilePath() {
-        return getAppDataPath().resolve("excluded_albums.txt");
+        return getAppDataPath().resolve(EXCLUSION_FILE_NAME);
     }
     
     public static Path getBookmarksFilePath() {
@@ -187,17 +233,22 @@ public class SettingsManager {
         }
     }
 
+    /**
+     * Gets the application data directory path based on the operating system.
+     * 
+     * @return Path to the application data directory
+     */
     public static Path getAppDataPath() {
-        String os = System.getProperty("os.name").toLowerCase();
-        String userHome = System.getProperty("user.home");
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String userHome = System.getProperty("user.home", "");
         
         try {
             Path appDataPath;
             if (os.contains("win")) {
                 String appData = System.getenv("APPDATA");
-                appDataPath = Paths.get(appData != null ? appData : userHome, "musimizer");
+                appDataPath = Paths.get(appData != null ? appData : userHome, APP_NAME);
             } else if (os.contains("mac")) {
-                appDataPath = Paths.get(userHome, "Library", "Application Support", "musimizer");
+                appDataPath = Paths.get(userHome, "Library", "Application Support", APP_NAME);
             } else {
                 appDataPath = Paths.get(userHome, ".config", "musimizer");
             }
