@@ -1,9 +1,9 @@
 package com.musimizer.ui;
 
+import com.musimizer.util.SettingsManager;
 import com.musimizer.controller.AppController;
 import com.musimizer.service.AlbumService;
 import com.musimizer.util.AudioMetadataRetriever;
-import com.musimizer.util.ExceptionHandler;
 
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -518,7 +518,7 @@ public class AppUI {
                     return;
                 AppController controller = (AppController) getScene().getRoot().getUserData();
                 controller.excludeAlbum(albumPath);
-                if (!controller.isShowingBookmarks())
+                if (!controller.isShowingBookmarks() && (controller.isShowingSearchResults() && SettingsManager.isApplyExclusionsToSearch()))
                     albumListView.getItems().remove(albumPath);
                 updateItem(albumPath, false);
             });
