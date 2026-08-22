@@ -1,6 +1,6 @@
 # Musimizer
 
-Musimizer selects random albums from your music collection. It only works if the collection is organized into an "Artist/Album" folder structure (the way ITunes does it).
+Musimizer is a companion to a large digital music library. It searches, bookmarks, selects listening at random (which you can then exclude from future selection), and helps with cover art. It works with any collection organized into an "Artist/Album" folder structure (the way ITunes does it).
 
 When you first run it, it will ask you for the location of your music collection. This should be the folder that has artist folders inside it.
 
